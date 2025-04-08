@@ -1,0 +1,302 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 250 250 252;
+  --foreground: 15 15 20;
+  --card: 255 255 255;
+  --card-foreground: 15 15 20;
+  --popover: 255 255 255;
+  --popover-foreground: 15 15 20;
+  --primary: 35 97 234;
+  --primary-foreground: 255 255 255;
+  --secondary: 224 234 255;
+  --secondary-foreground: 35 97 234;
+  --accent: 244 247 255;
+  --accent-foreground: 35 97 234;
+  --muted: 240 240 245;
+  --muted-foreground: 100 100 120;
+  --destructive: 234 45 75;
+  --destructive-foreground: 255 255 255;
+  --border: 220 220 230;
+  --input: 220 220 230;
+  --ring: 35 97 234;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: 10 12 18;
+  --foreground: 240 240 245;
+  --card: 22 25 35;
+  --card-foreground: 240 240 245;
+  --popover: 22 25 35;
+  --popover-foreground: 240 240 245;
+  --primary: 55 107 234;
+  --primary-foreground: 255 255 255;
+  --secondary: 20 35 80;
+  --secondary-foreground: 240 240 245;
+  --accent: 25 40 90;
+  --accent-foreground: 240 240 245;
+  --muted: 30 33 45;
+  --muted-foreground: 170 170 190;
+  --destructive: 234 45 75;
+  --destructive-foreground: 255 255 255;
+  --border: 40 45 60;
+  --input: 40 45 60;
+  --ring: 55 107 234;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground transition-colors duration-300;
+  }
+  
+  /* Improve text readability */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+  
+  p {
+    @apply leading-relaxed;
+  }
+  
+  a {
+    @apply transition-colors;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from { 
+    transform: translateY(20px);
+    opacity: 0; 
+  }
+  to { 
+    transform: translateY(0);
+    opacity: 1; 
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    opacity: 1; 
+  }
+  50% { 
+    opacity: 0.7; 
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes wave {
+  0% {
+    transform: translateX(0) translateZ(0) scaleY(1);
+  }
+  50% {
+    transform: translateX(-25%) translateZ(0) scaleY(0.8);
+  }
+  100% {
+    transform: translateX(-50%) translateZ(0) scaleY(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.5s ease-out forwards;
+}
+
+.animate-pulse-slow {
+  animation: pulse 3s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-wave {
+  animation: wave 12s linear infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-primary/30 rounded-full hover:bg-primary/50 transition-colors;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary/50;
+}
+
+/* Card styles */
+.card {
+  @apply bg-card text-card-foreground rounded-xl border border-border shadow-sm p-6 transition-all duration-300;
+}
+
+.card:hover {
+  @apply shadow-md border-primary/20;
+}
+
+/* Button styles with improved contrast */
+.btn {
+  @apply inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors 
+  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 
+  disabled:pointer-events-none disabled:opacity-50;
+}
+
+.btn-primary {
+  @apply bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 shadow-sm hover:shadow;
+}
+
+.btn-secondary {
+  @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 shadow-sm hover:shadow;
+}
+
+.btn-outline {
+  @apply border-2 border-primary bg-transparent text-primary hover:bg-primary/10 h-10 px-4 py-2;
+}
+
+.btn-ghost {
+  @apply hover:bg-muted text-foreground h-10 px-4 py-2;
+}
+
+.btn-destructive {
+  @apply bg-destructive text-destructive-foreground hover:bg-destructive/90 h-10 px-4 py-2;
+}
+
+/* Input styles */
+.input {
+  @apply flex h-10 w-full rounded-lg border-2 border-input bg-background px-3 py-2 text-sm 
+  ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium 
+  placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 
+  focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-primary 
+  disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+/* Repository card */
+.repo-card {
+  @apply card flex flex-col gap-4 hover:border-primary/40 transition-all duration-300 hover:translate-y-[-2px];
+}
+
+/* Navigation styles */
+.nav-link {
+  @apply relative px-4 py-2 text-foreground/80 hover:text-foreground transition-colors duration-200;
+}
+
+.nav-link-active {
+  @apply text-primary font-semibold;
+}
+
+.nav-link-active::after {
+  content: '';
+  @apply absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-full;
+}
+
+/* Page transitions */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.page-transition-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 300ms, transform 300ms;
+}
+
+/* Parallax scrolling classes */
+.parallax-bg {
+  @apply transition-transform;
+  will-change: transform;
+}
+
+.parallax-slow {
+  transform: translateY(var(--parallax-y, 0));
+}
+
+.parallax-medium {
+  transform: translateY(calc(var(--parallax-y, 0) * 1.5));
+}
+
+.parallax-fast {
+  transform: translateY(calc(var(--parallax-y, 0) * 2));
+}
+
+/* Geometric shapes for visual interest */
+.geometric-shape {
+  @apply absolute pointer-events-none opacity-70 blur-sm transition-all;
+}
+
+.blurred-circle {
+  @apply rounded-full absolute;
+  background: radial-gradient(circle at center, rgba(var(--primary), 0.6) 0%, rgba(var(--primary), 0) 70%);
+}
+
+.blurred-square {
+  @apply absolute rounded-lg;
+  background: radial-gradient(circle at center, rgba(var(--accent-foreground), 0.5) 0%, rgba(var(--accent-foreground), 0) 70%);
+}
+
+/* Custom checkbox styles */
+.custom-checkbox {
+  @apply relative inline-flex items-center;
+}
+
+.custom-checkbox input {
+  @apply absolute opacity-0 w-0 h-0;
+}
+
+.custom-checkbox .checkbox-inner {
+  @apply w-5 h-5 rounded-md border-2 border-input bg-background flex items-center justify-center mr-2;
+}
+
+.custom-checkbox input:checked ~ .checkbox-inner {
+  @apply bg-primary border-primary;
+}
+
+.custom-checkbox input:checked ~ .checkbox-inner:after {
+  content: "";
+  @apply block w-2 h-3.5 border-r-2 border-b-2 border-white rotate-45 mt-[-0.2rem];
+}
+
+/* Gradient text */
+.gradient-text {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-primary/80 to-primary;
+}
