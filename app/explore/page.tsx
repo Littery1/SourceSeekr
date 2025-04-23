@@ -267,108 +267,7 @@ export default function ExplorePage() {
     try {
       setLoadingMore(true);
       const nextPage = currentPage + 1;
-
-      // Import the GitHub API functions
-      const { fetchQualityRepos, processRepositoriesData } = await import(
-        "@/lib/github-api"
-      );
-
-      // Fetch more repositories from GitHub API
-      const fetchedRepos = await fetchQualityRepos(nextPage);
-      let processedRepos = await processRepositoriesData(fetchedRepos);
-
-      // Apply the same filters
-      if (languageFilter !== "all") {
-        processedRepos = processedRepos.filter(
-          (repo) =>
-            repo.language &&
-            repo.language.toLowerCase() === languageFilter.toLowerCase()
-        );
-      }
-
-      if (beginnerFriendly) {
-        processedRepos = processedRepos.filter(
-          (repo) =>
-            repo.topics &&
-            repo.topics.some(
-              (topic) =>
-                topic.includes("good-first-issue") ||
-                topic.includes("beginner") ||
-                topic.includes("first-timers")
-            )
-        );
-      }
-
-      if (topicFilter !== "all") {
-        processedRepos = processedRepos.filter(
-          (repo) => repo.topics && repo.topics.includes(topicFilter)
-        );
-      }
-
-      // Format repositories to match your interface
-      // Format repositories to match your interface
-      const formattedRepos = processedRepos.map((repo) => ({
-        id: repo.id, // Now numeric
-        repoId: repo.id,
-        name: repo.name,
-        owner: repo.owner,
-        fullName: `${repo.owner}/${repo.name}`,
-        description: repo.description,
-        language: repo.language,
-        stars:
-          typeof repo.stars === "string" ? parseInt(repo.stars) : repo.stars,
-        forks:
-          typeof repo.forks === "string" ? parseInt(repo.forks) : repo.forks,
-        issues:
-          typeof repo.issuesCount === "string"
-            ? parseInt(repo.issuesCount, 10)
-            : repo.issuesCount || 0, // Ensure number type
-        ownerAvatar: repo.ownerAvatar,
-        topics: repo.topics || [],
-        size:
-          typeof repo.size === "string" ? parseInt(repo.size) : repo.size || 0,
-        url: `https://github.com/${repo.owner}/${repo.name}`,
-        homepage: repo.homepage,
-        license: repo.license,
-        updatedAt: new Date(repo.updatedAt || Date.now()),
-        createdAt: new Date(repo.createdAt || Date.now()),
-      }));
-
-      // Add the new repositories to existing ones
-      setRepositories((prevRepos) => [...prevRepos, ...formattedRepos]);
-      setHasMore(formattedRepos.length > 0);
-      setCurrentPage(nextPage);
-
-      // Generate recommendation reasons for new repositories if user is logged in
-      if (session && formattedRepos.length > 0) {
-        try {
-          const { getRepositoryRecommendationReason } = await import(
-            "@/lib/deepseek-service"
-          );
-
-          const userProfile = {
-            username: session.user?.name || "user",
-            bio: "Developer",
-            languages: [
-              { language: "JavaScript", percentage: 60 },
-              { language: "TypeScript", percentage: 30 },
-            ],
-          };
-
-          const newReasons: Record<string, string> = { ...repoReasons };
-          for (const repo of formattedRepos) {
-            newReasons[repo.id] = await getRepositoryRecommendationReason(
-              repo,
-              userProfile,
-              userPreferences
-            );
-          }
-
-          setRepoReasons(newReasons);
-        } catch (error) {
-          console.error("Error generating recommendations:", error);
-        }
-      }
+      await fetchRepositories(nextPage);
     } catch (error) {
       console.error("Error loading more repositories:", error);
     } finally {
@@ -572,7 +471,17 @@ export default function ExplorePage() {
       <div className="bg-card border border-border rounded-xl p-6 mb-8 relative z-10">
         <form onSubmit={(e) => {
               e.preventDefault();
-              // Apply filters is handled automatically through useEffect dependencies
+              // Set active filters from current form values when submitted
+              setActiveFilters({
+                searchTerm,
+                languageFilter,
+                sizeFilter,
+                topicFilter,
+                sortBy,
+                beginnerFriendly
+              });
+              // Fetch repositories with new filters
+              fetchRepositories(1);
             }} className="flex flex-col gap-6">
           {/* Search */}
           <div className="relative">
