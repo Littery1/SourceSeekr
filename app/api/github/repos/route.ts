@@ -28,13 +28,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: repo });
     } 
     else if (type === 'search' && query) {
-      // Search repositories
-      const repos = await githubAPI.searchRepositories(query, page, githubToken);
-      const processedRepos = await githubAPI.processRepositoriesData(repos.slice(0, limit), {
-        maxRepos: limit,
-        userToken: githubToken
-      });
-      return NextResponse.json({ success: true, data: processedRepos });
+      try {
+        // Fix malformed query strings - common cause of 422 errors
+        const sanitizedQuery = query.trim().replace(/\s+/g, '+');
+        
+        // Search repositories
+        const repos = await githubAPI.searchRepositories(sanitizedQuery, page, githubToken);
+        
+        if (!repos || repos.length === 0) {
+          // Return empty results rather than processing nothing
+          return NextResponse.json({ 
+            success: true, 
+            data: [],
+            message: "No repositories found matching your query" 
+          });
+        }
+        
+        const processedRepos = await githubAPI.processRepositoriesData(repos.slice(0, limit), {
+          maxRepos: limit,
+          userToken: githubToken
+        });
+        
+        return NextResponse.json({ success: true, data: processedRepos });
+      } catch (searchError) {
+        console.error("Search query error:", searchError);
+        
+        // Return empty results for search errors rather than failing completely
+        return NextResponse.json({ 
+          success: false, 
+          data: [],
+          error: searchError instanceof Error ? searchError.message : "Error processing search query" 
+        }, { status: 400 });
+      }
     }
     else if (type === 'trending') {
       // Get trending repos
@@ -46,13 +71,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: processedRepos });
     }
     else if (type === 'popular') {
-      // Get popular repos
-      const repos = await githubAPI.fetchQualityRepos(page, githubToken);
-      const processedRepos = await githubAPI.processRepositoriesData(repos.slice(0, limit), {
-        maxRepos: limit,
-        userToken: githubToken
-      });
-      return NextResponse.json({ success: true, data: processedRepos });
+      try {
+        // Get popular repos with error handling
+        const repos = await githubAPI.fetchQualityRepos(page, githubToken);
+        
+        if (!repos || repos.length === 0) {
+          // Return empty array rather than trying to process nothing
+          return NextResponse.json({ 
+            success: true, 
+            data: [],
+            message: "No popular repositories found" 
+          });
+        }
+        
+        const processedRepos = await githubAPI.processRepositoriesData(repos.slice(0, limit), {
+          maxRepos: limit,
+          userToken: githubToken,
+          skipContributors: true,  // Skip these to avoid potential API errors
+          skipIssues: true,        // Skip these to avoid potential API errors
+          skipPullRequests: true   // Skip these to avoid potential API errors
+        });
+        
+        return NextResponse.json({ success: true, data: processedRepos });
+      } catch (error) {
+        console.error("Error fetching popular repositories:", error);
+        
+        // Return empty results for search errors rather than failing completely
+        return NextResponse.json({ 
+          success: false, 
+          data: [],
+          error: error instanceof Error ? error.message : "Error fetching popular repositories" 
+        }, { status: 400 });
+      }
     }
     else {
       // Invalid request

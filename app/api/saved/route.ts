@@ -1,13 +1,12 @@
 // @/app/api/saved/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserSavedRepositories } from '@/lib/repository-service';
-import { getServerSession } from "@auth/next";
-import { authOptions } from '@/auth';
+import { auth } from '@/auth';
 
 export async function GET(req: NextRequest) {
   try {
     // Get user session for authorization
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     
     if (!session?.user) {
       return NextResponse.json(

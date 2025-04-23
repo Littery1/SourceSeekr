@@ -234,12 +234,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Get the repository ID from the request URL
-    const id = request.nextUrl.searchParams.get("id");
+    // Get the repository fullName from the request URL
+    const fullName = request.nextUrl.searchParams.get("fullName");
 
-    if (!id) {
+    if (!fullName) {
       return NextResponse.json(
-        { error: "Repository ID is required" },
+        { error: "Repository fullName is required" },
         { status: 400 }
       );
     }
@@ -247,9 +247,14 @@ export async function DELETE(request: NextRequest) {
     // Find the repository to ensure it belongs to the current user
     const repo = await prisma.savedRepository.findFirst({
       where: {
-        id,
         userId: session.user.id,
+        repository: {
+          fullName
+        }
       },
+      include: {
+        repository: true
+      }
     });
 
     if (!repo) {
@@ -262,7 +267,7 @@ export async function DELETE(request: NextRequest) {
     // Delete the repository
     await prisma.savedRepository.delete({
       where: {
-        id,
+        id: repo.id,
       },
     });
 

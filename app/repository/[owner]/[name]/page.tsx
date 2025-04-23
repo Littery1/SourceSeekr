@@ -12,6 +12,7 @@ import {
 } from "@/lib/github-api";
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useRef, useCallback } from "react";
+import toast from "react-hot-toast";
 
 interface SimilarRepositoriesProps {
   language: string | null;
@@ -67,16 +68,39 @@ const SimilarRepositories = ({
   const fetchSimilarRepos = async () => {
     try {
       setLoading(true);
-      // Use a simpler query with just one topic to avoid 422 errors
-     const simplifiedTopics = topics.length > 0 ? [topics[0]] : [];
-
-      const fetchedRepos = await fetchSimilarRepositories(
-        language,
-        simplifiedTopics,
-        excludeRepo,
-        3
-      ); 
-      setSimilarRepos(fetchedRepos);
+      
+      // Fix by using our proxy API instead of direct GitHub API calls
+      const topicsToSearch = topics && topics.length > 0 ? [topics[0]] : [];
+      let query = "stars:>100";
+      
+      if (language) {
+        query += ` language:${language}`;
+      }
+      
+      if (topicsToSearch.length > 0) {
+        query += ` topic:${topicsToSearch[0]}`;
+      }
+      
+      // Exclude current repo
+      if (excludeRepo) {
+        query += ` -repo:${excludeRepo}`;
+      }
+      
+      // Use our proxy API
+      const response = await fetch(`/api/github/repos?type=search&query=${encodeURIComponent(query)}&limit=3`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch similar repos: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.data && data.data.length > 0) {
+        // If using our proxy, we need to transform data to match expected format
+        setSimilarRepos(data.data);
+      } else {
+        setSimilarRepos([]);
+      }
     } catch (error) {
       console.error("Error fetching similar repositories:", error);
       setSimilarRepos([]);
