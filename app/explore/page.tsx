@@ -119,12 +119,12 @@ export default function ExplorePage() {
           "@/lib/github-api"
         );
 
-        // Fetch repositories from GitHub API with filters
+        // Build the query string with filters
         let query = "";
         
         // Add language filter if selected
         if (languageFilter !== "all") {
-          query += `language:${languageFilter} `;
+          query += `language:${languageFilter.toLowerCase()} `;
         }
         
         // Add topic filter if selected
@@ -138,46 +138,95 @@ export default function ExplorePage() {
         }
         
         // Ensure we have some query
-        query = query.trim() || "stars:>100";
+        query = query.trim();
         
-        // Fetch repositories with query
-        const fetchedRepos = await fetchQualityRepos(1, query, beginnerFriendly);
-        const processedRepos = await processRepositoriesData(fetchedRepos, {
-          maxRepos: 10,
-        });
+        // Fetch repositories with query (pass empty string to use defaults if no filters)
+        try {
+          // Fetch repositories with query
+          const fetchedRepos = await fetchQualityRepos(1, query, beginnerFriendly);
+          const processedRepos = await processRepositoriesData(fetchedRepos, {
+            maxRepos: 15,
+          });
 
-        // Format repositories to match your interface
-        const formattedRepos = processedRepos.map((repo) => ({
-          id: repo.id, // ✅ Direct assignment (no string conversion)
-          repoId: repo.id, // ✅ Simplified since source is always number
-          name: repo.name,
-          owner: repo.owner,
-          fullName: `${repo.owner}/${repo.name}`,
-          description: repo.description,
-          language: repo.language,
-          stars:
-            typeof repo.stars === "string" ? parseInt(repo.stars) : repo.stars,
-          forks:
-            typeof repo.forks === "string" ? parseInt(repo.forks) : repo.forks,
-          issues:
-            typeof repo.issuesCount === "string"
-              ? parseInt(repo.issuesCount.replace(/[^\d]/g, "")) || 0
-              : repo.issuesCount || 0,
-          ownerAvatar: repo.ownerAvatar,
-          topics: repo.topics || [],
-          size:
-            typeof repo.size === "string"
-              ? parseInt(repo.size)
-              : repo.size || 0,
-          url: `https://github.com/${repo.owner}/${repo.name}`,
-          homepage: repo.homepage,
-          license: repo.license,
-          updatedAt: new Date(repo.updatedAt || Date.now()),
-          createdAt: new Date(repo.createdAt || Date.now()),
-        }));
+          // Format repositories to match your interface
+          const formattedRepos = processedRepos.map((repo) => ({
+            id: repo.id,
+            repoId: repo.id,
+            name: repo.name,
+            owner: repo.owner,
+            fullName: `${repo.owner}/${repo.name}`,
+            description: repo.description,
+            language: repo.language,
+            stars:
+              typeof repo.stars === "string" ? parseInt(repo.stars) : repo.stars,
+            forks:
+              typeof repo.forks === "string" ? parseInt(repo.forks) : repo.forks,
+            issues:
+              typeof repo.issuesCount === "string"
+                ? parseInt(repo.issuesCount.replace(/[^\d]/g, "")) || 0
+                : repo.issuesCount || 0,
+            ownerAvatar: repo.ownerAvatar,
+            topics: repo.topics || [],
+            size:
+              typeof repo.size === "string"
+                ? parseInt(repo.size)
+                : repo.size || 0,
+            url: `https://github.com/${repo.owner}/${repo.name}`,
+            homepage: repo.homepage,
+            license: repo.license,
+            updatedAt: new Date(repo.updatedAt || Date.now()),
+            createdAt: new Date(repo.createdAt || Date.now()),
+          }));
 
-        setRepositories(formattedRepos);
-        setHasMore(true);
+          setRepositories(formattedRepos);
+          setHasMore(true);
+        } catch (apiError) {
+          console.error("GitHub API error:", apiError);
+          
+          // If there was an error with the specific query, try a basic fallback query
+          if (query) {
+            console.log("Trying fallback query...");
+            const fallbackRepos = await fetchQualityRepos(1, "", false);
+            const processedRepos = await processRepositoriesData(fallbackRepos, {
+              maxRepos: 10,
+            });
+
+            // Process fallback repos
+            const formattedRepos = processedRepos.map((repo) => ({
+              id: repo.id,
+              repoId: repo.id,
+              name: repo.name,
+              owner: repo.owner,
+              fullName: `${repo.owner}/${repo.name}`,
+              description: repo.description,
+              language: repo.language,
+              stars:
+                typeof repo.stars === "string" ? parseInt(repo.stars) : repo.stars,
+              forks:
+                typeof repo.forks === "string" ? parseInt(repo.forks) : repo.forks,
+              issues:
+                typeof repo.issuesCount === "string"
+                  ? parseInt(repo.issuesCount.replace(/[^\d]/g, "")) || 0
+                  : repo.issuesCount || 0,
+              ownerAvatar: repo.ownerAvatar,
+              topics: repo.topics || [],
+              size:
+                typeof repo.size === "string"
+                  ? parseInt(repo.size)
+                  : repo.size || 0,
+              url: `https://github.com/${repo.owner}/${repo.name}`,
+              homepage: repo.homepage,
+              license: repo.license,
+              updatedAt: new Date(repo.updatedAt || Date.now()),
+              createdAt: new Date(repo.createdAt || Date.now()),
+            }));
+            
+            setRepositories(formattedRepos);
+            setHasMore(true);
+          } else {
+            throw apiError; // If fallback query also fails, re-throw the error
+          }
+        }
       } catch (error) {
         console.error("Error fetching repositories:", error);
         // Fallback data in case of error
@@ -354,14 +403,24 @@ export default function ExplorePage() {
       }
     });
 
-  // Get unique languages for filter dropdown
-  const languages = Array.from(
-    new Set(
-      repositories
-        .map((repo) => repo.language)
-        .filter((lang): lang is string => lang !== null)
-    )
-  );
+  // Programming language options for the filter dropdown
+  const languageOptions = {
+    JavaScript: "#f1e05a",
+    TypeScript: "#2b7489",
+    Python: "#3572A5",
+    Java: "#b07219",
+    Go: "#00ADD8",
+    Ruby: "#701516",
+    PHP: "#4F5D95",
+    CSS: "#563d7c", 
+    HTML: "#e34c26",
+    Swift: "#ffac45",
+    Kotlin: "#F18E33",
+    Rust: "#dea584",
+    C: "#555555",
+    "C++": "#f34b7d",
+    "C#": "#178600"
+  };
 
   // Get unique topics for filter dropdown (top 10 most common)
   const allTopics = repositories.flatMap((repo) => repo.topics);
@@ -535,7 +594,7 @@ export default function ExplorePage() {
                 onChange={(e) => setLanguageFilter(e.target.value)}
               >
                 <option value="all">All Languages</option>
-                {languages.map((lang) => (
+                {Object.keys(languageOptions).map((lang) => (
                   <option key={lang} value={lang}>
                     {lang}
                   </option>

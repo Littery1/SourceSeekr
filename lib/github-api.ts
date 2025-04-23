@@ -411,33 +411,39 @@
     
     // Add language filter based on parameters or user preferences
     if (!query || !query.includes('language:')) {
-      // Only use one language to prevent 422 errors
-      let languageQuery = '+language:javascript';
+      // Use a simple language query to prevent 422 errors
+      let language = 'javascript';
+
+      // Handle empty query by simplifying to just use stars
+      if (searchQuery === 'stars:>300 is:public') {
+        searchQuery = 'stars:>100';
+      }
       
-      // If the user has preferences in localStorage, use those instead
-      if (typeof window !== 'undefined') {
-        const savedPreferences = localStorage.getItem('sourceseekr-preferences');
-        if (savedPreferences) {
-          const prefs = JSON.parse(savedPreferences);
-          if (prefs.preferredLanguages && prefs.preferredLanguages.length > 0) {
-            // Only use the first preferred language to avoid 422 errors
-            if (prefs.preferredLanguages.length > 0) {
-              languageQuery = `+language:${prefs.preferredLanguages[0].toLowerCase()}`;
+      try {
+        // If the user has preferences in localStorage, use those instead
+        if (typeof window !== 'undefined') {
+          const savedPreferences = localStorage.getItem('sourceseekr-preferences');
+          if (savedPreferences) {
+            const prefs = JSON.parse(savedPreferences);
+            if (prefs.preferredLanguages && prefs.preferredLanguages.length > 0) {
+              language = prefs.preferredLanguages[0].toLowerCase();
             }
           }
         }
+      } catch (e) {
+        console.error('Error parsing preferences:', e);
       }
       
       // Only add language query if not already in the custom query
       if (!searchQuery.includes('language:')) {
-        searchQuery += languageQuery;
+        searchQuery += ` language:${language}`;
       }
     }
     
     // Add beginner-friendly filter if requested
     if (beginnerFriendly && !searchQuery.includes('good-first')) {
-      // Use topic individually with + to avoid OR which can cause 422 errors
-      searchQuery += ' topic:good-first-issue';
+      // Use a more stable parameter to avoid 422 errors
+      searchQuery += ' good-first-issues:>0';
     }
     
     // Using specific search query with minimum stars and issues/PRs
