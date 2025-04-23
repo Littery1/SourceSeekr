@@ -41,21 +41,21 @@ const PopularRepositoriesCarousel = () => {
       try {
         setLoading(true);
 
-        // Import the GitHub API functions
-        const { fetchQualityRepos, processRepositoriesData } = await import(
-          "@/lib/github-api"
-        );
+        // Use our server-side API to avoid CORS issues
+        const response = await fetch('/api/github/repos?type=popular&limit=5');
         
-        // Get GitHub token from session
-        const githubToken = session?.user?.githubAccessToken;
-
-        // Fetch repositories from GitHub API with auth token
-        const fetchedRepos = await fetchQualityRepos(1, githubToken);
-        const processedRepos = await processRepositoriesData(fetchedRepos, {
-          userToken: githubToken
-        });
-
-        setRepos(processedRepos);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch repositories: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+          setRepos(data.data);
+        } else {
+          console.error("Error in API response:", data.error);
+          setRepos([]);
+        }
       } catch (error) {
         console.error("Error fetching repositories:", error);
         // Fallback data in case of error

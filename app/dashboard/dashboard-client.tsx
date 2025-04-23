@@ -82,40 +82,77 @@ export default function DashboardClient({ session }: { session: Session }) {
       try {
         setLoading(true);
         
-        // Get GitHub token from session
-        const githubToken = session?.user?.githubAccessToken;
+        // Check if we have user preferences for recommendations
+        if (userPreferences.preferredLanguages.length > 0 || userPreferences.interests.length > 0) {
+          try {
+            // Import the Deepseek API
+            const { getRecommendationReason } = await import("@/lib/deepseek-api");
+            
+            // Build search query based on user preferences
+            let query = "";
+            
+            // Add languages
+            if (userPreferences.preferredLanguages.length > 0) {
+              query += userPreferences.preferredLanguages[0] + " ";
+            }
+            
+            // Add topics based on interests
+            if (userPreferences.interests.length > 0) {
+              query += userPreferences.interests[0] + " ";
+            }
+            
+            query = query.trim() || "stars:>1000"; // Default fallback
+            
+            // Use the server proxy API to avoid CORS issues
+            const response = await fetch(`/api/github/repos?type=search&query=${encodeURIComponent(query)}&limit=10`);
+            
+            if (!response.ok) {
+              throw new Error(`Failed to fetch repositories: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success && data.data && data.data.length > 0) {
+              // Generate recommendation reasons
+              const reasons: Record<string, string> = {};
+              data.data.forEach((repo: any) => {
+                reasons[repo.id.toString()] = getRecommendationReason(repo, userPreferences);
+              });
+              
+              setRecommendedRepos(data.data);
+              setRepoReasons(reasons);
+              return;
+            }
+          } catch (error) {
+            console.error("Error with recommendations, falling back to popular repos:", error);
+          }
+        }
         
-        // Import the Deepseek API
-        const { getRecommendedRepositories, getRecommendationReason } = await import("@/lib/deepseek-api");
+        // Fallback to popular repositories
+        const response = await fetch('/api/github/repos?type=popular&limit=10');
         
-        // Get recommendations with token
-        const recommendations = await getRecommendedRepositories(userPreferences, 10, githubToken);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch repositories: ${response.status}`);
+        }
         
-        if (recommendations && recommendations.length > 0) {
-          // Generate recommendation reasons
-          const reasons: Record<string, string> = {};
-          recommendations.forEach(repo => {
-            reasons[repo.id.toString()] = getRecommendationReason(repo, userPreferences);
-          });
-          
-          setRecommendedRepos(recommendations);
-          setRepoReasons(reasons);
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+          setRecommendedRepos(data.data);
         } else {
-          // Fallback to regular GitHub API if no recommendations
-          const { fetchQualityRepos, processRepositoriesData } = await import("@/lib/github-api");
-          const repos = await fetchQualityRepos(1, githubToken);
-          const processedRepos = await processRepositoriesData(repos, {
-            userToken: githubToken
-          });
-          setRecommendedRepos(processedRepos);
+          console.error("Error in API response:", data.error);
+          setRecommendedRepos([]);
+          
+          if (data.error && data.error.includes("rate limit")) {
+            setRateLimitError(true);
+          }
         }
       } catch (error) {
         console.error("Error fetching recommended repositories:", error);
         setRecommendedRepos([]);
         
         // Check if it's a rate limit error
-        if (error instanceof Error && error.message.includes("rate limit exceeded")) {
-          // Set the rate limit error state to true
+        if (error instanceof Error && error.message.includes("rate limit")) {
           setRateLimitError(true);
         }
       } finally {
