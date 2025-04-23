@@ -164,7 +164,7 @@ export default function DashboardClient({ session }: { session: Session }) {
     };
     
     fetchRecommendedRepos();
-  }, [userPreferences.preferredLanguages, userPreferences.interests, userPreferences.skillLevel, userPreferences.looking]);
+  }, [userPreferences]);
 
   const toggleSaveRepo = (repoId: string) => {
     try {

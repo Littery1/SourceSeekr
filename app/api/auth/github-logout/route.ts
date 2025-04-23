@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     
     // Clear local session first
     if (session) {
-      await signOut({ redirectTo: false });
+      await signOut({ redirect: false });
     }
     
     // Instead of redirecting to GitHub's logout URL, redirect directly to our app

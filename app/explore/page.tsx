@@ -258,7 +258,7 @@ export default function ExplorePage() {
   // Handle initial load
   useEffect(() => {
     fetchRepositories(1);
-  }, []);
+  }, [fetchRepositories]);
 
   // Function to load more repositories
   const loadMoreRepositories = async () => {

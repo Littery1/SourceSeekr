@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
 import { auth } from '@/auth';
 import * as githubAPI from '@/lib/github-api';
 

@@ -140,7 +140,7 @@ export default function ProfilePage() {
 
       fetchUserData();
     }
-  }, [session, status, router]);
+  }, [session, status, router, preferences]);
 
   const handleInterestToggle = (interest: string) => {
     setPreferences(prev => {
@@ -345,7 +345,7 @@ export default function ProfilePage() {
           <div className="bg-card rounded-xl border border-border p-6">
             <h2 className="text-xl font-bold mb-4">Preferred Programming Languages</h2>
             <p className="text-muted-foreground mb-4">
-              Select the languages you're most interested in to receive tailored repository recommendations.
+              Select the languages you&apos;re most interested in to receive tailored repository recommendations.
             </p>
             <div className="flex flex-wrap gap-2">
               {Object.entries(languageColors).map(([language, color]) => (
@@ -394,9 +394,9 @@ export default function ProfilePage() {
           
           {/* Looking For */}
           <div className="bg-card rounded-xl border border-border p-6">
-            <h2 className="text-xl font-bold mb-4">I'm Looking For</h2>
+            <h2 className="text-xl font-bold mb-4">I&apos;m Looking For</h2>
             <p className="text-muted-foreground mb-4">
-              Tell us what kind of repositories you're interested in discovering.
+              Tell us what kind of repositories you&apos;re interested in discovering.
             </p>
             <div className="flex flex-wrap gap-2">
               {lookingForOptions.map((item) => (

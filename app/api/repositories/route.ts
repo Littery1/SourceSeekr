@@ -2,8 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchQualityRepos, processRepositoriesData, checkRateLimit } from '@/lib/github-api';
 import { getRepositories, storeRepositories, getRepositoriesCount, isRepositoryStale } from '@/lib/repository-service';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/auth';
+import { auth } from '@/auth';
 import { getPersonalizedRepositories } from '@/lib/deepseek-service';
 
 // Mock function for getting GitHub user profile data
@@ -63,7 +62,7 @@ export async function GET(req: NextRequest) {
     const beginnerFriendly = url.searchParams.get('beginner') === 'true';
     
     // Get user session to personalize results and use their GitHub token
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     // Extract GitHub token from session if available
     const userToken = session?.user?.githubAccessToken;
     
@@ -176,7 +175,7 @@ export async function GET(req: NextRequest) {
         // For now we're using a hardcoded approach, this should be replaced with actual user preferences
         // from a dedicated user_preferences table in the database
         const userPreferences = {
-          interests: [],
+          interests: [] as string[],
           skillLevel: beginnerFriendly ? 'beginner' : 'intermediate',
           looking: beginnerFriendly ? ['Beginner Friendly'] : [],
           preferredLanguages: language !== 'all' ? [language] : []
@@ -239,7 +238,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Get user session for authorization
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     
     if (!session?.user || session.user.id !== userId) {
       return NextResponse.json(

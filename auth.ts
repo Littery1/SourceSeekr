@@ -13,7 +13,7 @@ console.log("GitHub Secret length:",
       ? process.env.GITHUB_SECRET.length 
       : "Not set");
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, authOptions } = NextAuth({
   session: { strategy: "jwt" },
   adapter: PrismaAdapter(prisma),
   debug: process.env.NODE_ENV === "development",

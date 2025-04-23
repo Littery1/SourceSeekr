@@ -104,6 +104,16 @@
     }
   };
 
+  // Export for GitHub stats API endpoint
+  export function getGitHubApiUsageStats() {
+    return apiCallStats.getStats();
+  }
+
+  export function resetGitHubApiUsageStats() {
+    apiCallStats.reset();
+    return { success: true, message: "GitHub API usage statistics reset successfully" };
+  }
+
   // Cache structure
   interface CacheItem<T> {
     data: T;
@@ -386,7 +396,7 @@
   /**
    * Fetch popular repositories based on stars, with optional query and filters
    */
-  export async function fetchQualityRepos(page = 1, query: string = '', beginnerFriendly: boolean = false, userToken?: string): Promise<GitHubRepo[]> {
+  export async function fetchQualityRepos(page = 1, query: string = '', beginnerFriendly: boolean = false, userToken?: string | null): Promise<GitHubRepo[]> {
     // Create a cache key based on parameters
     const cacheKey = `${query}_${beginnerFriendly ? 'beginner' : 'all'}_${page}`;
     
@@ -536,7 +546,7 @@
   /**
    * Fetch trending repositories (created in the last month)
    */
-  export async function fetchTrendingRepos(page = 1, userToken?: string): Promise<GitHubRepo[]> {
+  export async function fetchTrendingRepos(page = 1, userToken?: string | null): Promise<GitHubRepo[]> {
     // Return cached repos if available and valid
     if (repoCache.trending[page] && isCacheValid(repoCache.trending[page])) {
       return repoCache.trending[page].data;
@@ -585,7 +595,7 @@
   /**
    * Search repositories by keyword
    */
-  export async function searchRepositories(query: string, page = 1, userToken?: string): Promise<GitHubRepo[]> {
+  export async function searchRepositories(query: string, page = 1, userToken?: string | null): Promise<GitHubRepo[]> {
     // Sanitize input
     if (!query || query.trim() === '') {
       return [];
@@ -599,7 +609,7 @@
     }
 
     // Check rate limit first with user token
-    const hasQuota = await checkRateLimit(userToken);
+    const hasQuota = await checkRateLimit();
     if (!hasQuota) {
       throw new Error("GitHub API rate limit exceeded");
     }
@@ -654,7 +664,7 @@
   /**
    * Fetch the complete repository information by owner and name
    */
-  export async function fetchRepositoryByFullName(owner: string, name: string, userToken?: string): Promise<ProcessedRepo | null> {
+  export async function fetchRepositoryByFullName(owner: string, name: string, userToken?: string | null): Promise<ProcessedRepo | null> {
     const fullName = `${owner}/${name}`;
     
     // Return cached repo if available and valid
@@ -708,7 +718,7 @@
   /**
    * Fetch repository by ID
    */
-  export async function fetchRepositoryById(id: number, userToken?: string): Promise<ProcessedRepo | null> {
+  export async function fetchRepositoryById(id: number, userToken?: string | null): Promise<ProcessedRepo | null> {
     const idStr = id.toString();
     
     // Return cached repo if available and valid
@@ -762,7 +772,7 @@
     owner: string,
     repo: string,
     limit = 10,
-    userToken?: string
+    userToken?: string | null
   ): Promise<Contributor[]> {
     try {
       const hasQuota = await checkRateLimit();
@@ -815,7 +825,7 @@
     owner: string,
     repo: string,
     limit = 5,
-    userToken?: string
+    userToken?: string | null
   ): Promise<{ title: string; number: number; html_url: string }[]> {
     try {
       const hasQuota = await checkRateLimit();
@@ -845,7 +855,7 @@
   export async function fetchRepoPullRequests(
     owner: string,
     repo: string,
-    userToken?: string
+    userToken?: string | null
   ): Promise<number> {
     try {
       const hasQuota = await checkRateLimit();
@@ -878,7 +888,7 @@
   export async function fetchRepoReadme(
     owner: string,
     repo: string,
-    userToken?: string
+    userToken?: string | null
   ): Promise<string> {
     try {
       const hasQuota = await checkRateLimit();
@@ -907,7 +917,7 @@
     topics: string[],
     excludeRepo: string,
     limit = 3,
-    userToken?: string
+    userToken?: string | null
   ): Promise<GitHubRepo[]> {
     try {
       const hasQuota = await checkRateLimit();
@@ -985,7 +995,7 @@
   }
 
   // GraphQL implementation for fetching repository data
-  async function fetchRepositoryDataWithGraphQL(owner: string, name: string, userToken?: string): Promise<any> {
+  async function fetchRepositoryDataWithGraphQL(owner: string, name: string, userToken?: string | null): Promise<any> {
     return await safeGitHubApiCall(async () => {
       // Use the user's token if provided, otherwise use the app's token
       const token = userToken || process.env.GITHUB_TOKEN;
@@ -1109,7 +1119,7 @@
    */
   export async function processRepositoryData(
     repo: GitHubRepo,
-    userToken?: string
+    userToken?: string | null
   ): Promise<ProcessedRepo> {
     const [owner, repoName] = repo.full_name.split("/");
 

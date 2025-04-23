@@ -96,9 +96,9 @@ export const LoginForm = ({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
           <div>
-            <h3 className="font-bold">You're already signed in</h3>
+            <h3 className="font-bold">You&apos;re already signed in</h3>
             <p className="text-sm">
-              You're currently signed in as <span className="font-medium">{currentUser}</span>
+              You&apos;re currently signed in as <span className="font-medium">{currentUser}</span>
             </p>
           </div>
         </div>
@@ -152,7 +152,7 @@ export const LoginForm = ({
         </div>
         
         <p className="text-center text-sm text-muted-foreground mt-4">
-          Don't want to sign in? You can still{" "}
+          Don&apos;t want to sign in? You can still{" "}
           <Link
             href="/explore"
             className="text-primary hover:text-primary/80 font-medium"

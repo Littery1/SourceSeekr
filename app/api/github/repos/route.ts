@@ -22,10 +22,8 @@ export async function GET(request: NextRequest) {
     
     // Get the user's session and GitHub token
     const session = await auth();
-    // Check both locations where GitHub token might be stored
-    const githubToken = session?.accessToken || 
-                       (session as any)?.user?.githubAccessToken || 
-                        null;
+    // Get GitHub token from user session
+    const githubToken = session?.user?.githubAccessToken || null;
     
     // Check which type of request we need to make
     if (type === 'repository' && owner && name) {
