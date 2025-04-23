@@ -43,9 +43,14 @@ export const Repository = ({
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  const repoNameParts = fullName ? fullName.split('/') : name.split('/');
-  const repoOwner = owner || (repoNameParts.length > 1 ? repoNameParts[0] : '');
-  const repoName = repoNameParts.length > 1 ? repoNameParts[1] : name;
+  // Make sure we have valid strings for the repo name parts
+  const fullNameStr = typeof fullName === 'string' ? fullName : '';
+  const nameStr = typeof name === 'string' ? name : '';
+  const ownerStr = typeof owner === 'string' ? owner : '';
+  
+  const repoNameParts = fullNameStr ? fullNameStr.split('/') : nameStr.split('/');
+  const repoOwner = ownerStr || (repoNameParts.length > 1 ? repoNameParts[0] : '');
+  const repoName = repoNameParts.length > 1 ? repoNameParts[1] : nameStr;
   const completeFullName = `${repoOwner}/${repoName}`;
   
   // Check if repository is already saved when component mounts
@@ -166,7 +171,7 @@ export const Repository = ({
           />
           <div>
             <Link 
-              href={`/repository/${repoOwner}/${repoName}`}
+              href={`/repository/${String(repoOwner)}/${String(repoName)}`}
               className="font-medium text-lg hover:text-primary transition-colors duration-200"
             >
               {repoName}
@@ -277,7 +282,7 @@ export const Repository = ({
         </div>
         
         <Link 
-          href={`/repository/${repoOwner}/${repoName}`}
+          href={`/repository/${String(repoOwner)}/${String(repoName)}`}
           className="btn btn-outline btn-sm"
         >
           Details

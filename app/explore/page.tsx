@@ -150,6 +150,11 @@ export default function ExplorePage() {
       
       // Ensure we have some query
       query = query.trim();
+      
+      // If no query is provided, use a default query to avoid empty searches
+      if (!query) {
+        query = "stars:>100";
+      }
 
       console.log("Searching with query:", query);
       

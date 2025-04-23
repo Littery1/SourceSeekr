@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ 
           success: true, 
           repositories: data.items || [],
+          data: data.items || [],  // Add data property for backward compatibility
           total_count: data.total_count || 0
         });
       } catch (searchError) {
@@ -99,7 +100,8 @@ export async function GET(request: NextRequest) {
       const repos = await githubAPI.fetchTrendingRepos(page, githubToken);
       return NextResponse.json({ 
         success: true, 
-        repositories: repos 
+        repositories: repos,
+        data: repos  // Add data property for backward compatibility
       });
     }
     else if (type === 'popular') {
@@ -112,13 +114,15 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ 
             success: true, 
             repositories: [],
+            data: [],  // Add data property for backward compatibility
             message: "No popular repositories found" 
           });
         }
         
         return NextResponse.json({ 
           success: true, 
-          repositories: repos
+          repositories: repos,
+          data: repos  // Add data property for backward compatibility
         });
       } catch (error) {
         console.error("Error fetching popular repositories:", error);

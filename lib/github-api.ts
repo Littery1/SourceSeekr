@@ -461,7 +461,13 @@
     }
     
     // Combine query parts
-    const finalQuery = queryParts.join(' ');
+    let finalQuery = queryParts.join(' ').trim();
+    
+    // If query is empty after processing, use a default query
+    if (!finalQuery) {
+      finalQuery = "stars:>100";
+    }
+    
     console.log("GitHub search query:", finalQuery);
     
     // Make the API request
@@ -596,9 +602,9 @@
    * Search repositories by keyword
    */
   export async function searchRepositories(query: string, page = 1, userToken?: string | null): Promise<GitHubRepo[]> {
-    // Sanitize input
+    // Sanitize input and provide default if empty
     if (!query || query.trim() === '') {
-      return [];
+      query = "stars:>100"; // Default query if none provided
     }
     
     const cacheKey = `${query.toLowerCase()}_${page}`;

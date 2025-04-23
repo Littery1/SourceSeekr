@@ -303,7 +303,7 @@ export default function DashboardClient({ session }: { session: Session }) {
                   <div>
                     <h2 className="text-xl font-bold flex flex-wrap items-center gap-2 mb-1">
                       <Link 
-                        href={`/repository/${repo.owner}/${repo.name}`}
+                        href={`/repository/${String(repo.owner)}/${String(repo.name)}`}
                         className="hover:text-primary transition-colors"
                       >
                         {repo.owner}/{repo.name}
@@ -370,7 +370,7 @@ export default function DashboardClient({ session }: { session: Session }) {
                 
                 <div className="flex flex-row md:flex-col gap-3 min-w-[130px]">
                   <Link 
-                    href={`/repository/${repo.owner}/${repo.name}`}
+                    href={`/repository/${String(repo.owner)}/${String(repo.name)}`}
                     className="btn btn-primary btn-sm flex-1"
                   >
                     View Details
