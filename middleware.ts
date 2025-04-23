@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { auth } from './auth';
+import { checkAuthFromCookies } from './lib/middleware-auth';
+
+// This file runs in the Edge Runtime, so can't use Prisma directly
 
 // List of paths that don't require authentication
 const publicPaths = [
@@ -20,7 +22,7 @@ const protectedPaths = [
 ];
 
 export async function middleware(request: NextRequest) {
-  const session = await auth();
+  const isAuthenticated = checkAuthFromCookies(request.cookies);
   const { pathname } = request.nextUrl;
   
   // Check if the current path is protected
@@ -35,14 +37,14 @@ export async function middleware(request: NextRequest) {
   }
   
   // If the path is protected and the user is not authenticated, redirect to login
-  if (isProtectedPath && !session) {
+  if (isProtectedPath && !isAuthenticated) {
     const url = new URL('/login', request.url);
     url.searchParams.set('callbackUrl', encodeURI(pathname));
     return NextResponse.redirect(url);
   }
   
   // If user is already authenticated and trying to access login page, redirect them to dashboard
-  if (isLoginPage && session) {
+  if (isLoginPage && isAuthenticated) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
   

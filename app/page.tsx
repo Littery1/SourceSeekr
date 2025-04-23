@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -391,21 +391,10 @@ const PopularRepositoriesCarousel = () => {
   );
 };
 
-export default function HomePage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
+// Component to handle search params (this will be wrapped in Suspense)
+function AuthErrorHandler() {
   const searchParams = useSearchParams();
-  const [scrollY, setScrollY] = useState(0);
-  const heroRef = useRef(null);
-
-    const [mounted, setMounted] = useState(false);
-
-    // Add this useEffect to handle mounting
-    useEffect(() => {
-      setMounted(true);
-    }, []);
-
-  // Check for auth errors
+  
   useEffect(() => {
     const error = searchParams.get("error");
     if (error) {
@@ -435,6 +424,22 @@ export default function HomePage() {
       window.history.replaceState({}, "", newURL.toString());
     }
   }, [searchParams]);
+  
+  return null;
+}
+
+export default function HomePage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [scrollY, setScrollY] = useState(0);
+  const heroRef = useRef(null);
+
+  const [mounted, setMounted] = useState(false);
+
+  // Add this useEffect to handle mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Handle scroll events for parallax effect
   useEffect(() => {
@@ -599,6 +604,11 @@ export default function HomePage() {
 
   return (
     <div className="relative overflow-hidden">
+      {/* Wrapped search params usage in Suspense boundary */}
+      <Suspense fallback={null}>
+        <AuthErrorHandler />
+      </Suspense>
+      
       {/* Background Elements for Visual Interest */}
       {mounted ? (
         <>

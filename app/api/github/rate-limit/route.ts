@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import * as githubAPI from '@/lib/github-api';
 
+export const dynamic = "force-dynamic";
+
 /**
  * API endpoint to check GitHub rate limit
  * This allows client-side code to check rate limit without CORS issues
