@@ -37,11 +37,7 @@ export const LoginForm = ({
   const handleClearSession = async () => {
     try {
       // Use our utility function to clear auth state
-      const success = await clearAuthState('/login');
-      
-      if (!success) {
-        throw new Error("Failed to sign out properly");
-      }
+      await clearAuthState('/login');
       
       // If the page hasn't reloaded already, show a success message
       toast.success("Previous session cleared. You can now sign in with a different account.");

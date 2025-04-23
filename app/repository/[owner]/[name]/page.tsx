@@ -693,9 +693,6 @@ useEffect(() => {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('sourceseekr-token')}`
-          },
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('sourceseekr-token')}`
           }
         });
         
