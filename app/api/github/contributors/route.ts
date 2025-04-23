@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     // Get the current session to extract GitHub token if available
     const session = await auth();
-    const userToken = (session as any)?.accessToken || null;
+    const userToken = session?.user?.githubAccessToken || null;
 
     // Make the GitHub API request with the user's token
     const res = await fetch(
