@@ -49,7 +49,9 @@ export default function SavedPage() {
       
       try {
         setLoading(true);
-        const res = await fetch('/api/repositories/saved');
+        const res = await fetch('/api/repositories/saved', {
+          credentials: 'include'
+        });
         
         if (!res.ok) {
           throw new Error(`Failed to fetch saved repositories: ${res.status}`);

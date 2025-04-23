@@ -1,4 +1,3 @@
-// /explore page
 "use client";
 
 import { useState, useEffect } from "react";
@@ -28,6 +27,7 @@ interface Repository {
   updatedAt: Date;
   createdAt: Date;
 }
+
 export default function ExplorePage() {
   const { data: session } = useSession();
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -396,6 +396,7 @@ export default function ExplorePage() {
         headers: {
           "Content-Type": "application/json"
         },
+        credentials: 'include',
         body: JSON.stringify({
           repoId: repo.id,
           name: repo.name,
@@ -769,7 +770,7 @@ export default function ExplorePage() {
                             />
                           </svg>
                           <span className="text-sm">
-                            {formatNumber(parseInt(repo.stars, 10))}
+                            {formatNumber(parseInt(repo.stars.toString(), 10))}
                           </span>
                         </div>
 
@@ -787,7 +788,7 @@ export default function ExplorePage() {
                             />
                           </svg>
                           <span className="text-sm">
-                            {formatNumber(parseInt(repo.forks, 10))}
+                            {formatNumber(parseInt(repo.forks.toString(), 10))}
                           </span>
                         </div>
 
