@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 export async function GET(request: NextRequest) {
   try {
     // Get the current session
-    const session = await getServerSession();
+    const session = await auth();
 
     // Check if the user is authenticated
     if (!session?.user?.email) {
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Get the current session
-    const session = await getServerSession();
+    const session = await auth();
 
     // Check if the user is authenticated
     if (!session?.user?.email) {
@@ -171,123 +171,131 @@ export async function POST(request: NextRequest) {
     const issuesNum = typeof issues === 'string' ? parseInt(issues) : issues;
     const sizeNum = typeof size === 'string' ? parseInt(size) : size;
 
-    // Create or find the repository record first
-    const repository = await prisma.repository.upsert({
-      where: {
-        repoId: repoId,
-      },
-      update: {
-        fullName: fullName || `${owner}/${name}`,
-        description,
-        language,
-        stars: starsNum || 0,
-        forks: forksNum || 0,
-        issues: issuesNum || 0,
-        ownerAvatar,
-        topics: topics || [],
-        size: sizeNum || 0,
-        url,
-        homepage,
-        license,
-        updatedAt: updatedAt ? new Date(updatedAt) : new Date(),
-      },
-      create: {
-        repoId: repoId,
-        owner,
-        name,
-        fullName: fullName || `${owner}/${name}`,
-        description,
-        language,
-        stars: starsNum || 0,
-        forks: forksNum || 0,
-        issues: issuesNum || 0,
-        ownerAvatar,
-        topics: topics || [],
-        size: sizeNum || 0,
-        url,
-        homepage,
-        license,
-        createdAt: createdAt ? new Date(createdAt) : new Date(),
-        updatedAt: updatedAt ? new Date(updatedAt) : new Date(),
-      },
-    });
-
-    // Check if repository is already saved
-    const existingSavedRepo = await prisma.savedRepository.findFirst({
-      where: {
-        userId: user.id,
-        repositoryId: repository.id,
-      },
-    });
-
-    if (existingSavedRepo) {
-      return NextResponse.json(
-        {
-          success: true,
-          message: "Repository already saved",
-          repository: {
-            id: existingSavedRepo.id,
-            name: repository.name,
-            owner: repository.owner,
-            fullName: repository.fullName,
-            description: repository.description,
-            language: repository.language,
-            stars: repository.stars,
-            forks: repository.forks,
-            issues: repository.issues,
-            ownerAvatar: repository.ownerAvatar,
-            topics: repository.topics,
-            size: repository.size,
-            url: repository.url,
-            homepage: repository.homepage,
-            license: repository.license,
-            updatedAt: repository.updatedAt,
-            createdAt: repository.createdAt,
-            notes: existingSavedRepo.notes,
-            savedAt: existingSavedRepo.createdAt,
-          },
+    try {
+      // Create or find the repository record first
+      const repository = await prisma.repository.upsert({
+        where: {
+          repoId: repoId,
         },
-        { status: 200 }
+        update: {
+          fullName: fullName || `${owner}/${name}`,
+          description,
+          language,
+          stars: starsNum || 0,
+          forks: forksNum || 0,
+          issues: issuesNum || 0,
+          ownerAvatar,
+          topics: topics || [],
+          size: sizeNum || 0,
+          url,
+          homepage,
+          license,
+          updatedAt: updatedAt ? new Date(updatedAt) : new Date(),
+        },
+        create: {
+          repoId: repoId,
+          owner,
+          name,
+          fullName: fullName || `${owner}/${name}`,
+          description,
+          language,
+          stars: starsNum || 0,
+          forks: forksNum || 0,
+          issues: issuesNum || 0,
+          ownerAvatar,
+          topics: topics || [],
+          size: sizeNum || 0,
+          url,
+          homepage,
+          license,
+          createdAt: createdAt ? new Date(createdAt) : new Date(),
+          updatedAt: updatedAt ? new Date(updatedAt) : new Date(),
+        },
+      });
+
+      // Check if repository is already saved
+      const existingSavedRepo = await prisma.savedRepository.findFirst({
+        where: {
+          userId: user.id,
+          repositoryId: repository.id,
+        },
+      });
+
+      if (existingSavedRepo) {
+        return NextResponse.json(
+          {
+            success: true,
+            message: "Repository already saved",
+            repository: {
+              id: existingSavedRepo.id,
+              name: repository.name,
+              owner: repository.owner,
+              fullName: repository.fullName,
+              description: repository.description,
+              language: repository.language,
+              stars: repository.stars,
+              forks: repository.forks,
+              issues: repository.issues,
+              ownerAvatar: repository.ownerAvatar,
+              topics: repository.topics,
+              size: repository.size,
+              url: repository.url,
+              homepage: repository.homepage,
+              license: repository.license,
+              updatedAt: repository.updatedAt,
+              createdAt: repository.createdAt,
+              notes: existingSavedRepo.notes,
+              savedAt: existingSavedRepo.createdAt,
+            },
+          },
+          { status: 200 }
+        );
+      }
+
+      // Save the user's reference to the repository
+      const savedRepo = await prisma.savedRepository.create({
+        data: {
+          userId: user.id,
+          repositoryId: repository.id,
+        },
+        include: {
+          repository: true,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Repository saved successfully",
+        repository: {
+          id: savedRepo.id,
+          repoId: repository.repoId,
+          name: repository.name,
+          owner: repository.owner,
+          fullName: repository.fullName,
+          description: repository.description,
+          language: repository.language,
+          stars: repository.stars,
+          forks: repository.forks,
+          issues: repository.issues,
+          ownerAvatar: repository.ownerAvatar,
+          topics: repository.topics,
+          size: repository.size,
+          url: repository.url,
+          homepage: repository.homepage,
+          license: repository.license,
+          updatedAt: repository.updatedAt,
+          createdAt: repository.createdAt,
+          notes: savedRepo.notes,
+          savedAt: savedRepo.createdAt,
+        },
+      });
+    } catch (dbError) {
+      console.error("Database error:", dbError);
+      return NextResponse.json(
+        { error: "Database error when saving repository" },
+        { status: 500 }
       );
     }
-
-    // Save the user's reference to the repository
-    const savedRepo = await prisma.savedRepository.create({
-      data: {
-        userId: user.id,
-        repositoryId: repository.id,
-      },
-      include: {
-        repository: true,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: "Repository saved successfully",
-      repository: {
-        id: savedRepo.id,
-        repoId: repository.repoId,
-        name: repository.name,
-        owner: repository.owner,
-        fullName: repository.fullName,
-        description: repository.description,
-        language: repository.language,
-        stars: repository.stars,
-        forks: repository.forks,
-        issues: repository.issues,
-        ownerAvatar: repository.ownerAvatar,
-        topics: repository.topics,
-        size: repository.size,
-        url: repository.url,
-        homepage: repository.homepage,
-        license: repository.license,
-        updatedAt: repository.updatedAt,
-        createdAt: repository.createdAt,
-        notes: savedRepo.notes,
-        savedAt: savedRepo.createdAt,
-      },
-    });
   } catch (error) {
     console.error("Error saving repository:", error);
     return NextResponse.json(
@@ -301,7 +309,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     // Get the current session
-    const session = await getServerSession();
+    const session = await auth();
 
     // Check if the user is authenticated
     if (!session?.user?.email) {

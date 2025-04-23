@@ -411,7 +411,8 @@
     
     // Add language filter based on parameters or user preferences
     if (!query || !query.includes('language:')) {
-      let languageQuery = '+language:javascript+language:typescript+language:python+language:java';
+      // Only use one language to prevent 422 errors
+      let languageQuery = '+language:javascript';
       
       // If the user has preferences in localStorage, use those instead
       if (typeof window !== 'undefined') {
@@ -419,10 +420,10 @@
         if (savedPreferences) {
           const prefs = JSON.parse(savedPreferences);
           if (prefs.preferredLanguages && prefs.preferredLanguages.length > 0) {
-            languageQuery = prefs.preferredLanguages
-              .slice(0, 3)
-              .map((lang: string) => `+language:${lang.toLowerCase()}`)
-              .join('');
+            // Only use the first preferred language to avoid 422 errors
+            if (prefs.preferredLanguages.length > 0) {
+              languageQuery = `+language:${prefs.preferredLanguages[0].toLowerCase()}`;
+            }
           }
         }
       }
@@ -435,7 +436,8 @@
     
     // Add beginner-friendly filter if requested
     if (beginnerFriendly && !searchQuery.includes('good-first')) {
-      searchQuery += ' topic:good-first-issue OR topic:beginner-friendly OR topic:first-timers-only';
+      // Use topic individually with + to avoid OR which can cause 422 errors
+      searchQuery += ' topic:good-first-issue';
     }
     
     // Using specific search query with minimum stars and issues/PRs
