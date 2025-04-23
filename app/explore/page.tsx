@@ -394,8 +394,7 @@ export default function ExplorePage() {
       const res = await fetch("/api/repositories/saved", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem('sourceseekr-token')}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           repoId: repo.id,
@@ -608,8 +607,7 @@ export default function ExplorePage() {
             </div>
             <button type="submit" className="btn btn-primary">Apply Filters</button>
           </div>
-          </form>
-        </div>
+        </form>
       </div>
 
       {/* AI Recommendation Banner - Different versions for auth and non-auth users */}

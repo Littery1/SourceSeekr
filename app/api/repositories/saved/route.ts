@@ -65,18 +65,25 @@ export async function GET(request: NextRequest) {
     // Format the response data
     const formattedRepos = savedRepos.map((savedRepo) => ({
       id: savedRepo.id,
+      repoId: savedRepo.repository.repoId,
       name: savedRepo.repository.name,
       owner: savedRepo.repository.owner,
       fullName: `${savedRepo.repository.owner}/${savedRepo.repository.name}`,
       description: savedRepo.repository.description,
       language: savedRepo.repository.language,
-      stars: savedRepo.repository.stars.toString(),
-      forks: savedRepo.repository.forks.toString(),
-      issues: savedRepo.repository.issues.toString(),
+      stars: savedRepo.repository.stars,
+      forks: savedRepo.repository.forks,
+      issues: savedRepo.repository.issues,
       ownerAvatar: savedRepo.repository.ownerAvatar,
+      topics: savedRepo.repository.topics || [],
+      size: savedRepo.repository.size || 0,
       url: savedRepo.repository.url,
-      notes: savedRepo.notes,
+      homepage: savedRepo.repository.homepage,
+      license: savedRepo.repository.license,
+      updatedAt: savedRepo.repository.updatedAt,
+      createdAt: savedRepo.repository.createdAt,
       savedAt: savedRepo.createdAt,
+      notes: savedRepo.notes,
     }));
 
     return NextResponse.json({ repositories: formattedRepos });
@@ -106,6 +113,7 @@ export async function POST(request: NextRequest) {
     // Parse the request body
     const body = await request.json();
     const {
+      repoId,
       owner,
       name,
       fullName,
@@ -115,7 +123,13 @@ export async function POST(request: NextRequest) {
       forks,
       issues,
       ownerAvatar,
+      topics,
+      size,
       url,
+      homepage,
+      license,
+      updatedAt,
+      createdAt
     } = body;
 
     // Validate required fields
@@ -126,60 +140,91 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if repository is already saved
-    const existingRepo = await prisma.savedRepository.findFirst({
-      where: {
-        userId: session.user.id,
-        repository: {
-          owner,
-          name,
-        },
-      },
-      include: {
-        repository: true,
-      },
-    });
-
-    if (existingRepo) {
-      return NextResponse.json(
-        {
-          error: "Repository already saved",
-          repository: existingRepo,
-        },
-        { status: 409 }
-      );
-    }
+    // Convert string values to numbers if needed
+    const starsNum = typeof stars === 'string' ? parseInt(stars) : stars;
+    const forksNum = typeof forks === 'string' ? parseInt(forks) : forks;
+    const issuesNum = typeof issues === 'string' ? parseInt(issues) : issues;
+    const sizeNum = typeof size === 'string' ? parseInt(size) : size;
 
     // Create or find the repository record first
     const repository = await prisma.repository.upsert({
       where: {
-        repoId: body.repoId,
+        repoId: repoId,
       },
       update: {
-        fullName: `${owner}/${name}`, // Add missing required field
-        repoId: body.repoId,
+        fullName: fullName || `${owner}/${name}`,
         description,
         language,
-        stars: stars ? parseInt(stars) : 0,
-        forks: forks ? parseInt(forks) : 0,
-        issues: issues ? parseInt(issues) : 0,
+        stars: starsNum || 0,
+        forks: forksNum || 0,
+        issues: issuesNum || 0,
         ownerAvatar,
+        topics: topics || [],
+        size: sizeNum || 0,
         url,
+        homepage,
+        license,
+        updatedAt: updatedAt ? new Date(updatedAt) : new Date(),
       },
       create: {
+        repoId: repoId,
         owner,
         name,
-        fullName: `${owner}/${name}`, // Add missing required field
-        repoId: body.repoId,
+        fullName: fullName || `${owner}/${name}`,
         description,
         language,
-        stars: stars ? parseInt(stars) : 0,
-        forks: forks ? parseInt(forks) : 0,
-        issues: issues ? parseInt(issues) : 0,
+        stars: starsNum || 0,
+        forks: forksNum || 0,
+        issues: issuesNum || 0,
         ownerAvatar,
+        topics: topics || [],
+        size: sizeNum || 0,
         url,
+        homepage,
+        license,
+        createdAt: createdAt ? new Date(createdAt) : new Date(),
+        updatedAt: updatedAt ? new Date(updatedAt) : new Date(),
       },
     });
+
+    // Check if repository is already saved
+    const existingSavedRepo = await prisma.savedRepository.findFirst({
+      where: {
+        userId: session.user.id,
+        repositoryId: repository.id,
+      },
+    });
+
+    if (existingSavedRepo) {
+      return NextResponse.json(
+        {
+          success: true,
+          message: "Repository already saved",
+          repository: {
+            id: existingSavedRepo.id,
+            name: repository.name,
+            owner: repository.owner,
+            fullName: repository.fullName,
+            description: repository.description,
+            language: repository.language,
+            stars: repository.stars,
+            forks: repository.forks,
+            issues: repository.issues,
+            ownerAvatar: repository.ownerAvatar,
+            topics: repository.topics,
+            size: repository.size,
+            url: repository.url,
+            homepage: repository.homepage,
+            license: repository.license,
+            updatedAt: repository.updatedAt,
+            createdAt: repository.createdAt,
+            notes: existingSavedRepo.notes,
+            savedAt: existingSavedRepo.createdAt,
+          },
+        },
+        { status: 200 }
+      );
+    }
 
     // Save the user's reference to the repository
     const savedRepo = await prisma.savedRepository.create({
@@ -197,16 +242,23 @@ export async function POST(request: NextRequest) {
       message: "Repository saved successfully",
       repository: {
         id: savedRepo.id,
-        name: savedRepo.repository.name,
-        owner: savedRepo.repository.owner,
-        fullName: `${savedRepo.repository.owner}/${savedRepo.repository.name}`,
-        description: savedRepo.repository.description,
-        language: savedRepo.repository.language,
-        stars: savedRepo.repository.stars,
-        forks: savedRepo.repository.forks,
-        issues: savedRepo.repository.issues,
-        ownerAvatar: savedRepo.repository.ownerAvatar,
-        url: savedRepo.repository.url,
+        repoId: repository.repoId,
+        name: repository.name,
+        owner: repository.owner,
+        fullName: repository.fullName,
+        description: repository.description,
+        language: repository.language,
+        stars: repository.stars,
+        forks: repository.forks,
+        issues: repository.issues,
+        ownerAvatar: repository.ownerAvatar,
+        topics: repository.topics,
+        size: repository.size,
+        url: repository.url,
+        homepage: repository.homepage,
+        license: repository.license,
+        updatedAt: repository.updatedAt,
+        createdAt: repository.createdAt,
         notes: savedRepo.notes,
         savedAt: savedRepo.createdAt,
       },
