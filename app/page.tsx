@@ -19,6 +19,8 @@ const PopularRepositoriesCarousel = () => {
   const [direction, setDirection] = useState(0);
   const [savedRepos, setSavedRepos] = useState<Set<string>>(new Set());
 
+  const { data: session } = useSession();
+  
   useEffect(() => {
     // Load saved repositories from localStorage
     const loadSavedRepos = () => {
@@ -43,10 +45,15 @@ const PopularRepositoriesCarousel = () => {
         const { fetchQualityRepos, processRepositoriesData } = await import(
           "@/lib/github-api"
         );
+        
+        // Get GitHub token from session
+        const githubToken = session?.user?.githubAccessToken;
 
-        // Fetch repositories from GitHub API
-        const fetchedRepos = await fetchQualityRepos(1);
-        const processedRepos = await processRepositoriesData(fetchedRepos);
+        // Fetch repositories from GitHub API with auth token
+        const fetchedRepos = await fetchQualityRepos(1, githubToken);
+        const processedRepos = await processRepositoriesData(fetchedRepos, {
+          userToken: githubToken
+        });
 
         setRepos(processedRepos);
       } catch (error) {
@@ -59,7 +66,7 @@ const PopularRepositoriesCarousel = () => {
     };
 
     fetchRepos();
-  }, []);
+  }, [session]);
 
   const nextRepo = () => {
     setDirection(1);

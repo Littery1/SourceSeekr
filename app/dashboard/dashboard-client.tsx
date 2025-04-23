@@ -36,6 +36,7 @@ export default function DashboardClient({ session }: { session: Session }) {
   const [recommendedRepos, setRecommendedRepos] = useState<Repository[]>([]);
   const [repoReasons, setRepoReasons] = useState<Record<string, string>>({});
   const [savedRepos, setSavedRepos] = useState<Set<string>>(new Set());
+  const [rateLimitError, setRateLimitError] = useState(false);
   const [userPreferences, setUserPreferences] = useState<{
     interests: string[];
     skillLevel: string;
@@ -81,11 +82,14 @@ export default function DashboardClient({ session }: { session: Session }) {
       try {
         setLoading(true);
         
+        // Get GitHub token from session
+        const githubToken = session?.user?.githubAccessToken;
+        
         // Import the Deepseek API
         const { getRecommendedRepositories, getRecommendationReason } = await import("@/lib/deepseek-api");
         
-        // Get recommendations
-        const recommendations = await getRecommendedRepositories(userPreferences, 10);
+        // Get recommendations with token
+        const recommendations = await getRecommendedRepositories(userPreferences, 10, githubToken);
         
         if (recommendations && recommendations.length > 0) {
           // Generate recommendation reasons
@@ -99,8 +103,10 @@ export default function DashboardClient({ session }: { session: Session }) {
         } else {
           // Fallback to regular GitHub API if no recommendations
           const { fetchQualityRepos, processRepositoriesData } = await import("@/lib/github-api");
-          const repos = await fetchQualityRepos(1);
-          const processedRepos = await processRepositoriesData(repos);
+          const repos = await fetchQualityRepos(1, githubToken);
+          const processedRepos = await processRepositoriesData(repos, {
+            userToken: githubToken
+          });
           setRecommendedRepos(processedRepos);
         }
       } catch (error) {
@@ -136,8 +142,6 @@ export default function DashboardClient({ session }: { session: Session }) {
       console.error("Error saving repository:", error);
     }
   };
-
-  const [rateLimitError, setRateLimitError] = useState(false);
 
   if (loading) {
     return (

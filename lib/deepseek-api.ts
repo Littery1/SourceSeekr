@@ -35,7 +35,8 @@ interface Repository {
 // This is a mock function that would actually connect to Deepseek in a real implementation
 export async function getRecommendedRepositories(
   userPreferences: UserPreferences,
-  count = 5
+  count = 5,
+  githubToken?: string | null
 ): Promise<Repository[]> {
   // This would be a real API call to Deepseek
   // For now, we'll simulate by filtering repositories
@@ -44,8 +45,8 @@ export async function getRecommendedRepositories(
     // Import GitHub API functions
     const { searchRepositories, processRepositoriesData, checkRateLimit, GitHubRateLimitError } = await import('./github-api');
     
-    // Check rate limit first
-    const hasQuota = await checkRateLimit();
+    // Check rate limit first with token
+    const hasQuota = await checkRateLimit(githubToken);
     if (!hasQuota) {
       throw new GitHubRateLimitError();
     }
@@ -113,17 +114,19 @@ export async function getRecommendedRepositories(
     // Add default sorting and ensure we get active projects
     query += "sort:stars";
     
-    // Perform the search
-    const repos = await searchRepositories(query.trim(), 1);
+    // Perform the search with token
+    const repos = await searchRepositories(query.trim(), 1, githubToken);
     
     // Check for rate limit again before processing (which makes multiple API calls)
-    const stillHasQuota = await checkRateLimit();
+    const stillHasQuota = await checkRateLimit(githubToken);
     if (!stillHasQuota) {
       throw new GitHubRateLimitError();
     }
     
-    // Process the results (limit to 5 to reduce API calls)
-    return await processRepositoriesData(repos.slice(0, 5));
+    // Process the results (limit to 5 to reduce API calls) with token
+    return await processRepositoriesData(repos.slice(0, 5), {
+      userToken: githubToken
+    });
   } catch (error) {
     console.error("Error getting Deepseek recommendations:", error);
     return [];

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/auth';
+import { getServerSession } from 'next-auth';
+import { auth } from '@/auth';
 import * as githubAPI from '@/lib/github-api';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     
     // Only allow authenticated users with admin permission to view stats
     // You would need to add an isAdmin field to your user model
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     
     // Only allow authenticated users with admin permission to reset stats
     if (!session?.user) {

@@ -202,23 +202,46 @@
       // Only check rate limit once every 5 minutes, unless we're getting low
       if (now - lastRateLimitCheck > RATE_LIMIT_CACHE_DURATION || remainingRequests < 20) {
         console.log("Checking GitHub rate limit via API");
-        const res = await fetch("https://api.github.com/rate_limit", {
-          headers: getHeaders(userToken)
-        });
         
-        if (!res.ok) {
-          // If unauthorized, assume we can't make requests
-          if (res.status === 401 || res.status === 403) {
-            console.error("GitHub authentication error during rate limit check:", res.status);
+        // On the client-side, use our API endpoint to avoid CORS issues
+        if (typeof window !== 'undefined') {
+          try {
+            const res = await fetch("/api/github/rate-limit");
+            if (!res.ok) {
+              console.error("Error checking rate limit via proxy API:", res.status);
+              return false;
+            }
+            const data = await res.json();
+            if (!data.success) {
+              return false;
+            }
+            remainingRequests = 100; // Arbitrary number since we don't get the actual count
+            lastRateLimitCheck = now;
+            return data.hasQuota;
+          } catch (err) {
+            console.error("Failed to check rate limit via proxy:", err);
             return false;
           }
-          throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
+        } else {
+          // Server-side direct API call
+          const res = await fetch("https://api.github.com/rate_limit", {
+            headers: getHeaders(userToken)
+          });
+          
+          if (!res.ok) {
+            // If unauthorized, assume we can't make requests
+            if (res.status === 401 || res.status === 403) {
+              console.error("GitHub authentication error during rate limit check:", res.status);
+              return false;
+            }
+            throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
+          }
+          
+          const data = await res.json();
+          remainingRequests = data.resources.core.remaining;
+          lastRateLimitCheck = now;
+          console.log(`GitHub API rate limit: ${remainingRequests} requests remaining`);
         }
-        
-        const data = await res.json();
-        remainingRequests = data.resources.core.remaining;
-        lastRateLimitCheck = now;
-        console.log(`GitHub API rate limit: ${remainingRequests} requests remaining`);
       } else {
         // Decrement our cached count each time to be conservative
         remainingRequests -= 1;
@@ -369,8 +392,8 @@
       return repoCache.popular[page].data;
     }
 
-    // Check rate limit first
-    const hasQuota = await checkRateLimit();
+    // Check rate limit first with user token
+    const hasQuota = await checkRateLimit(userToken);
     if (!hasQuota) {
       throw new Error("GitHub API rate limit exceeded");
     }
@@ -431,8 +454,8 @@
       return repoCache.trending[page].data;
     }
 
-    // Check rate limit first
-    const hasQuota = await checkRateLimit();
+    // Check rate limit first with user token
+    const hasQuota = await checkRateLimit(userToken);
     if (!hasQuota) {
       throw new Error("GitHub API rate limit exceeded");
     }
@@ -487,8 +510,8 @@
       return repoCache.searchResults[cacheKey].data;
     }
 
-    // Check rate limit first
-    const hasQuota = await checkRateLimit();
+    // Check rate limit first with user token
+    const hasQuota = await checkRateLimit(userToken);
     if (!hasQuota) {
       throw new Error("GitHub API rate limit exceeded");
     }
