@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatDate, formatNumber, formatFileSize } from "@/lib/github-api";
+import toast from "react-hot-toast";
 
 interface Repository {
   id: number;
@@ -107,8 +108,7 @@ export default function ExplorePage() {
   const [rateLimitError, setRateLimitError] = useState(false);
   const [rateLimitMessage, setRateLimitMessage] = useState("");
 
-  // In your explore page component
-  // New code (fixed)
+  // Fetch repositories with filters
   useEffect(() => {
     const fetchRepositories = async () => {
       try {
@@ -119,10 +119,31 @@ export default function ExplorePage() {
           "@/lib/github-api"
         );
 
-        // Fetch repositories from GitHub API
-        const fetchedRepos = await fetchQualityRepos(1);
+        // Fetch repositories from GitHub API with filters
+        let query = "";
+        
+        // Add language filter if selected
+        if (languageFilter !== "all") {
+          query += `language:${languageFilter} `;
+        }
+        
+        // Add topic filter if selected
+        if (topicFilter !== "all") {
+          query += `topic:${topicFilter} `;
+        }
+        
+        // Add search term if provided
+        if (searchTerm.trim()) {
+          query += searchTerm.trim();
+        }
+        
+        // Ensure we have some query
+        query = query.trim() || "stars:>100";
+        
+        // Fetch repositories with query
+        const fetchedRepos = await fetchQualityRepos(1, query, beginnerFriendly);
         const processedRepos = await processRepositoriesData(fetchedRepos, {
-          maxRepos: 5,
+          maxRepos: 10,
         });
 
         // Format repositories to match your interface
@@ -168,7 +189,7 @@ export default function ExplorePage() {
     };
 
     fetchRepositories();
-  }, []);
+  }, [languageFilter, topicFilter, beginnerFriendly, searchTerm]);
 
   // Function to load more repositories
   const loadMoreRepositories = async () => {
@@ -355,17 +376,15 @@ export default function ExplorePage() {
     .map(([topic]) => topic);
 
   // Function to save a repository
-  // Fixed code
   const handleSaveRepository = async (repositoryId: number) => {
     if (!session) {
       // Prompt to login if not authenticated
-      alert("Please sign in to save repositories");
+      toast.error("Please sign in to save repositories");
       return;
     }
 
     try {
-      // Convert the string ID to a number if your API expects a number
-      // Or use the repoId property which is already a number
+      // Find the repository in our list
       const repo = repositories.find((r) => r.id === repositoryId);
 
       if (!repo) {
@@ -376,15 +395,29 @@ export default function ExplorePage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('sourceseekr-token')}`
         },
         body: JSON.stringify({
-          userId: session?.user?.id,
-          // Use the numeric repoId instead of the string id
-          repositoryId: repo.repoId,
+          repoId: repo.id,
+          name: repo.name,
+          owner: repo.owner,
+          fullName: repo.fullName,
+          description: repo.description,
+          language: repo.language,
+          stars: repo.stars,
+          forks: repo.forks,
+          issues: repo.issues,
+          ownerAvatar: repo.ownerAvatar,
+          topics: repo.topics,
+          size: repo.size,
+          url: repo.url,
+          homepage: repo.homepage,
+          license: repo.license,
+          updatedAt: repo.updatedAt,
+          createdAt: repo.createdAt
         }),
       });
 
-      // Rest of your code
       if (!res.ok) {
         throw new Error(`Failed to save repository: ${res.status}`);
       }
@@ -392,13 +425,13 @@ export default function ExplorePage() {
       const data = await res.json();
 
       if (data.success) {
-        alert("Repository saved successfully!");
+        toast.success("Repository saved successfully!");
       } else {
         throw new Error(data.error || "Failed to save repository");
       }
     } catch (error) {
       console.error("Error saving repository:", error);
-      alert("Failed to save repository. Please try again.");
+      toast.error("Failed to save repository. Please try again.");
     }
   };
 
@@ -458,7 +491,10 @@ export default function ExplorePage() {
 
       {/* Filters and Search */}
       <div className="bg-card border border-border rounded-xl p-6 mb-8 relative z-10">
-        <div className="flex flex-col gap-6">
+        <form onSubmit={(e) => {
+              e.preventDefault();
+              // Apply filters is handled automatically through useEffect dependencies
+            }} className="flex flex-col gap-6">
           {/* Search */}
           <div className="relative">
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
@@ -556,7 +592,8 @@ export default function ExplorePage() {
           </div>
 
           {/* Toggle for beginner-friendly */}
-          <div className="flex items-center">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
             <input
               type="checkbox"
               id="beginnerFriendly"
@@ -568,7 +605,10 @@ export default function ExplorePage() {
               Show only beginner-friendly repositories (good documentation and
               labeled issues)
             </label>
+            </div>
+            <button type="submit" className="btn btn-primary">Apply Filters</button>
           </div>
+          </form>
         </div>
       </div>
 

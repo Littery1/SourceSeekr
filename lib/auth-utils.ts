@@ -25,3 +25,15 @@ export function clearAuthState(redirectUrl?: string): Promise<void> {
     }, 100);
   });
 }
+
+/**
+ * Get the GitHub token from the session
+ * @returns The GitHub token or null if not authenticated
+ */
+export function getGitHubToken(): string | null {
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("sourceseekr-token");
+    return token;
+  }
+  return null;
+}

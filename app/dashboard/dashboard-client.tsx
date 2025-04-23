@@ -76,7 +76,10 @@ export default function DashboardClient({ session }: { session: Session }) {
     
     loadSavedRepos();
     loadPreferences();
-    
+  }, []);
+  
+  // Fetch repositories when preferences change
+  useEffect(() => {
     // Fetch repositories
     const fetchRecommendedRepos = async () => {
       try {
@@ -161,7 +164,7 @@ export default function DashboardClient({ session }: { session: Session }) {
     };
     
     fetchRecommendedRepos();
-  }, [userPreferences]);
+  }, [userPreferences.preferredLanguages, userPreferences.interests, userPreferences.skillLevel, userPreferences.looking]);
 
   const toggleSaveRepo = (repoId: string) => {
     try {

@@ -384,12 +384,20 @@
   }
 
   /**
-   * Fetch popular repositories based on stars
+   * Fetch popular repositories based on stars, with optional query and filters
    */
-  export async function fetchQualityRepos(page = 1, userToken?: string): Promise<GitHubRepo[]> {
+  export async function fetchQualityRepos(page = 1, query: string = '', beginnerFriendly: boolean = false, userToken?: string): Promise<GitHubRepo[]> {
+    // Create a cache key based on parameters
+    const cacheKey = `${query}_${beginnerFriendly ? 'beginner' : 'all'}_${page}`;
+    
+    // Create a structure for storing different query results
+    if (!repoCache.popular[page]) {
+      repoCache.popular[page] = {};
+    }
+    
     // Return cached repos if available and valid
-    if (repoCache.popular[page] && isCacheValid(repoCache.popular[page])) {
-      return repoCache.popular[page].data;
+    if (repoCache.popular[page][cacheKey] && isCacheValid(repoCache.popular[page][cacheKey])) {
+      return repoCache.popular[page][cacheKey].data;
     }
 
     // Check rate limit first with user token
@@ -398,26 +406,41 @@
       throw new Error("GitHub API rate limit exceeded");
     }
 
-    // Build language query based on parameters
-    let languageQuery = '+language:javascript+language:typescript+language:python+language:java';
+    // Build search query
+    let searchQuery = query || 'stars:>300 is:public';
     
-    // If the user has preferences in localStorage, use those instead
-    if (typeof window !== 'undefined') {
-      const savedPreferences = localStorage.getItem('sourceseekr-preferences');
-      if (savedPreferences) {
-        const prefs = JSON.parse(savedPreferences);
-        if (prefs.preferredLanguages && prefs.preferredLanguages.length > 0) {
-          languageQuery = prefs.preferredLanguages
-            .slice(0, 3)
-            .map((lang: string) => `+language:${lang.toLowerCase()}`)
-            .join('');
+    // Add language filter based on parameters or user preferences
+    if (!query || !query.includes('language:')) {
+      let languageQuery = '+language:javascript+language:typescript+language:python+language:java';
+      
+      // If the user has preferences in localStorage, use those instead
+      if (typeof window !== 'undefined') {
+        const savedPreferences = localStorage.getItem('sourceseekr-preferences');
+        if (savedPreferences) {
+          const prefs = JSON.parse(savedPreferences);
+          if (prefs.preferredLanguages && prefs.preferredLanguages.length > 0) {
+            languageQuery = prefs.preferredLanguages
+              .slice(0, 3)
+              .map((lang: string) => `+language:${lang.toLowerCase()}`)
+              .join('');
+          }
         }
       }
+      
+      // Only add language query if not already in the custom query
+      if (!searchQuery.includes('language:')) {
+        searchQuery += languageQuery;
+      }
+    }
+    
+    // Add beginner-friendly filter if requested
+    if (beginnerFriendly && !searchQuery.includes('good-first')) {
+      searchQuery += ' topic:good-first-issue OR topic:beginner-friendly OR topic:first-timers-only';
     }
     
     // Using specific search query with minimum stars and issues/PRs
     const res = await fetch(
-      `https://api.github.com/search/repositories?q=is:public+stars:>100+has:issues${languageQuery}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
+      `https://api.github.com/search/repositories?q=${encodeURIComponent(searchQuery)}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
       { headers: getHeaders(userToken) }
     );
 
@@ -436,8 +459,13 @@
         )
     );
 
-    // Cache the results
-    repoCache.popular[page] = {
+    // Create cache structure for this page if needed
+    if (!repoCache.popular[page]) {
+      repoCache.popular[page] = {};
+    }
+
+    // Cache the results with the query-specific key
+    repoCache.popular[page][cacheKey] = {
       data: filteredRepos,
       timestamp: Date.now(),
     };

@@ -656,6 +656,7 @@ useEffect(() => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('sourceseekr-token')}`
           },
           body: JSON.stringify({
             repoId: repository.id,
@@ -690,6 +691,12 @@ useEffect(() => {
         // Remove from saved
         const response = await fetch(`/api/repositories/saved?fullName=${repository.fullName}`, {
           method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('sourceseekr-token')}`
+          },
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('sourceseekr-token')}`
+          }
         });
         
         if (response.ok) {
