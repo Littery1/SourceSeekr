@@ -12,101 +12,131 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const owner = searchParams.get('owner');
     const name = searchParams.get('name');
-    const query = searchParams.get('query');
+    const q = searchParams.get('q');  // Direct query parameter
+    const query = searchParams.get('query') || q;  // Support both query and q
     const type = searchParams.get('type') || 'repository';
     const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '5', 10);
+    const limit = parseInt(searchParams.get('limit') || '10', 10);
+    const sort = searchParams.get('sort') || 'stars';
+    const order = searchParams.get('order') || 'desc';
     
     // Get the user's session and GitHub token
     const session = await auth();
-    const githubToken = session?.user?.githubAccessToken || null;
+    // Check both locations where GitHub token might be stored
+    const githubToken = session?.accessToken || 
+                       (session as any)?.user?.githubAccessToken || 
+                        null;
     
     // Check which type of request we need to make
     if (type === 'repository' && owner && name) {
       // Fetch specific repository
       const repo = await githubAPI.fetchRepositoryByFullName(owner, name, githubToken);
-      return NextResponse.json({ success: true, data: repo });
+      return NextResponse.json({ success: true, repository: repo });
     } 
-    else if (type === 'search' && query) {
+    else if ((type === 'search' || q) && query) {
       try {
         // Fix malformed query strings - common cause of 422 errors
-        const sanitizedQuery = query.trim().replace(/\s+/g, '+');
+        const sanitizedQuery = query.trim();
         
-        // Search repositories
-        const repos = await githubAPI.searchRepositories(sanitizedQuery, page, githubToken);
+        // Make the GitHub API request
+        const headers = githubAPI.getHeaders(githubToken);
+        const apiUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(sanitizedQuery)}&sort=${sort}&order=${order}&per_page=${limit}&page=${page}`;
         
-        if (!repos || repos.length === 0) {
-          // Return empty results rather than processing nothing
-          return NextResponse.json({ 
-            success: true, 
-            data: [],
-            message: "No repositories found matching your query" 
-          });
+        console.log(`Making GitHub API request: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl, { headers });
+        
+        if (!response.ok) {
+          console.error(`GitHub API error: ${response.status} - ${response.statusText}`);
+          throw new Error(`GitHub API error: ${response.status} - ${response.statusText}`);
         }
         
-        const processedRepos = await githubAPI.processRepositoriesData(repos.slice(0, limit), {
-          maxRepos: limit,
-          userToken: githubToken
+        const data = await response.json();
+        return NextResponse.json({ 
+          success: true, 
+          repositories: data.items || [],
+          total_count: data.total_count || 0
         });
-        
-        return NextResponse.json({ success: true, data: processedRepos });
       } catch (searchError) {
         console.error("Search query error:", searchError);
         
-        // Return empty results for search errors rather than failing completely
-        return NextResponse.json({ 
-          success: false, 
-          data: [],
-          error: searchError instanceof Error ? searchError.message : "Error processing search query" 
-        }, { status: 400 });
+        // Try a fallback simpler query if the original failed
+        try {
+          const fallbackQuery = "stars:>50";
+          const headers = githubAPI.getHeaders(githubToken);
+          const apiUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(fallbackQuery)}&sort=stars&order=desc&per_page=${limit}&page=1`;
+          
+          console.log(`Making fallback GitHub API request: ${apiUrl}`);
+          
+          const response = await fetch(apiUrl, { headers });
+          
+          if (!response.ok) {
+            return NextResponse.json({ 
+              success: false, 
+              repositories: [],
+              error: "Failed to fetch repositories even with fallback query"
+            }, { status: 500 });
+          }
+          
+          const data = await response.json();
+          return NextResponse.json({ 
+            success: true, 
+            repositories: data.items || [],
+            total_count: data.total_count || 0,
+            fallback: true
+          });
+        } catch (fallbackError) {
+          return NextResponse.json({ 
+            success: false, 
+            repositories: [],
+            error: "All GitHub API requests failed"
+          }, { status: 500 });
+        }
       }
     }
     else if (type === 'trending') {
       // Get trending repos
       const repos = await githubAPI.fetchTrendingRepos(page, githubToken);
-      const processedRepos = await githubAPI.processRepositoriesData(repos.slice(0, limit), {
-        maxRepos: limit,
-        userToken: githubToken
+      return NextResponse.json({ 
+        success: true, 
+        repositories: repos 
       });
-      return NextResponse.json({ success: true, data: processedRepos });
     }
     else if (type === 'popular') {
       try {
         // Get popular repos with error handling
-        const repos = await githubAPI.fetchQualityRepos(page, githubToken);
+        const repos = await githubAPI.fetchQualityRepos(page, '', false, githubToken);
         
         if (!repos || repos.length === 0) {
-          // Return empty array rather than trying to process nothing
+          // Return empty array
           return NextResponse.json({ 
             success: true, 
-            data: [],
+            repositories: [],
             message: "No popular repositories found" 
           });
         }
         
-        const processedRepos = await githubAPI.processRepositoriesData(repos.slice(0, limit), {
-          maxRepos: limit,
-          userToken: githubToken,
-          skipContributors: true,  // Skip these to avoid potential API errors
-          skipIssues: true,        // Skip these to avoid potential API errors
-          skipPullRequests: true   // Skip these to avoid potential API errors
+        return NextResponse.json({ 
+          success: true, 
+          repositories: repos
         });
-        
-        return NextResponse.json({ success: true, data: processedRepos });
       } catch (error) {
         console.error("Error fetching popular repositories:", error);
         
-        // Return empty results for search errors rather than failing completely
+        // Return empty results
         return NextResponse.json({ 
           success: false, 
-          data: [],
+          repositories: [],
           error: error instanceof Error ? error.message : "Error fetching popular repositories" 
-        }, { status: 400 });
+        }, { status: 500 });
       }
     }
     else {
       // Invalid request
-      return NextResponse.json({ success: false, error: 'Invalid request parameters' }, { status: 400 });
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid request parameters' 
+      }, { status: 400 });
     }
   } catch (error) {
     console.error("Error with GitHub API proxy:", error);

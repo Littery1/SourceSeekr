@@ -353,6 +353,33 @@ export default function ExplorePage() {
     .slice(0, 10)
     .map(([topic]) => topic);
 
+  // Track which repositories are saved
+  const [savedRepoIds, setSavedRepoIds] = useState<number[]>([]);
+
+  // Fetch user's saved repositories to know which ones are already saved
+  useEffect(() => {
+    const fetchSavedRepoIds = async () => {
+      if (!session) return;
+      
+      try {
+        const res = await fetch('/api/repositories/saved', {
+          credentials: 'include'
+        });
+        
+        if (!res.ok) return;
+        
+        const data = await res.json();
+        // Extract repo IDs from saved repositories
+        const ids = data.repositories.map((repo: any) => repo.repoId);
+        setSavedRepoIds(ids);
+      } catch (error) {
+        console.error("Error fetching saved repository IDs:", error);
+      }
+    };
+    
+    fetchSavedRepoIds();
+  }, [session]);
+
   // Function to save a repository
   const handleSaveRepository = async (repositoryId: number) => {
     if (!session) {
@@ -368,48 +395,74 @@ export default function ExplorePage() {
       if (!repo) {
         throw new Error("Repository not found");
       }
-
-      const res = await fetch("/api/repositories/saved", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          repoId: repo.id,
-          name: repo.name,
-          owner: repo.owner,
-          fullName: repo.fullName,
-          description: repo.description,
-          language: repo.language,
-          stars: repo.stars,
-          forks: repo.forks,
-          issues: repo.issues,
-          ownerAvatar: repo.ownerAvatar,
-          topics: repo.topics,
-          size: repo.size,
-          url: repo.url,
-          homepage: repo.homepage,
-          license: repo.license,
-          updatedAt: repo.updatedAt,
-          createdAt: repo.createdAt
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to save repository: ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success("Repository saved successfully!");
+      
+      // Check if repo is already saved
+      if (savedRepoIds.includes(repositoryId)) {
+        // If already saved, remove it
+        const res = await fetch(`/api/repositories/saved?fullName=${encodeURIComponent(repo.fullName)}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        
+        if (!res.ok) {
+          throw new Error(`Failed to remove repository: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          toast.success("Repository removed from saved list");
+          // Update saved IDs state
+          setSavedRepoIds(prevIds => prevIds.filter(id => id !== repositoryId));
+        } else {
+          throw new Error(data.error || "Failed to remove repository");
+        }
       } else {
-        throw new Error(data.error || "Failed to save repository");
+        // If not saved, save it
+        const res = await fetch("/api/repositories/saved", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            repoId: repo.id,
+            name: repo.name,
+            owner: repo.owner,
+            fullName: repo.fullName,
+            description: repo.description,
+            language: repo.language,
+            stars: repo.stars,
+            forks: repo.forks,
+            issues: repo.issues,
+            ownerAvatar: repo.ownerAvatar,
+            topics: repo.topics,
+            size: repo.size,
+            url: repo.url,
+            homepage: repo.homepage,
+            license: repo.license,
+            updatedAt: repo.updatedAt,
+            createdAt: repo.createdAt
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Failed to save repository: ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        if (data.success) {
+          toast.success("Repository saved successfully!");
+          // Update saved IDs state
+          setSavedRepoIds(prevIds => [...prevIds, repositoryId]);
+        } else {
+          throw new Error(data.error || "Failed to save repository");
+        }
       }
     } catch (error) {
-      console.error("Error saving repository:", error);
-      toast.error("Failed to save repository. Please try again.");
+      console.error("Error managing repository save:", error);
+      toast.error("Failed to update repository. Please try again.");
     }
   };
 
@@ -875,12 +928,12 @@ export default function ExplorePage() {
                     </a>
                     <button
                       onClick={() => handleSaveRepository(repo.id)}
-                      className="btn btn-ghost btn-sm flex-1 flex items-center justify-center"
+                      className={`btn ${savedRepoIds.includes(repo.id) ? 'btn-primary' : 'btn-ghost'} btn-sm flex-1 flex items-center justify-center`}
                       disabled={!session}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
+                        fill={savedRepoIds.includes(repo.id) ? "currentColor" : "none"}
                         viewBox="0 0 24 24"
                         strokeWidth={1.5}
                         stroke="currentColor"
@@ -892,7 +945,7 @@ export default function ExplorePage() {
                           d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
                         />
                       </svg>
-                      Save
+                      {savedRepoIds.includes(repo.id) ? 'Saved' : 'Save'}
                     </button>
                   </div>
                 </div>

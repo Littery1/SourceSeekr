@@ -406,18 +406,21 @@
       throw new Error("GitHub API rate limit exceeded");
     }
 
-    // Build search query
-    let searchQuery = query || 'stars:>300 is:public';
+    // Build search query, starting with simpler default
+    let searchQuery = 'stars:>50';
     
-    // Add language filter based on parameters or user preferences
-    if (!query || !query.includes('language:')) {
-      // Use a simple language query to prevent 422 errors
+    // If a custom query is provided, use it instead of the default
+    if (query && query.trim() !== '') {
+      searchQuery = query.trim();
+    }
+    
+    // Ensure the query doesn't get too complex - GitHub API has limitations
+    let queryParts = [];
+    
+    // Only add language if specified and no language already in the query
+    if (!searchQuery.includes('language:')) {
+      // Use language filter from preferences or current filter
       let language = 'javascript';
-
-      // Handle empty query by simplifying to just use stars
-      if (searchQuery === 'stars:>300 is:public') {
-        searchQuery = 'stars:>100';
-      }
       
       try {
         // If the user has preferences in localStorage, use those instead
@@ -434,51 +437,100 @@
         console.error('Error parsing preferences:', e);
       }
       
-      // Only add language query if not already in the custom query
-      if (!searchQuery.includes('language:')) {
-        searchQuery += ` language:${language}`;
+      // Create a clean query with minimal complexity
+      queryParts.push(searchQuery);
+      queryParts.push(`language:${language}`);
+    } else {
+      // Keep the query as is if it already has language specification
+      queryParts.push(searchQuery);
+    }
+    
+    // Add beginner-friendly filter if requested and not already in query
+    if (beginnerFriendly && !searchQuery.includes('good-first-issues')) {
+      queryParts.push('good-first-issues:>0');
+    }
+    
+    // Combine query parts
+    const finalQuery = queryParts.join(' ');
+    console.log("GitHub search query:", finalQuery);
+    
+    // Make the API request
+    try {
+      // When on client-side, use our proxy API to avoid CORS issues
+      let res;
+      if (typeof window !== 'undefined') {
+        // Use our proxy API on client-side
+        res = await fetch(`/api/github/repos?q=${encodeURIComponent(finalQuery)}&page=${page}`, {
+          credentials: 'include'
+        });
+      } else {
+        // Direct API call on server-side
+        res = await fetch(
+          `https://api.github.com/search/repositories?q=${encodeURIComponent(finalQuery)}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
+          { headers: getHeaders(userToken) }
+        );
       }
+      
+      if (!res.ok) {
+        console.error(`GitHub API error: ${res.status} ${res.statusText}`);
+        
+        // If query is complex and fails, try a simpler fallback query
+        if (finalQuery.split(' ').length > 2) {
+          // Fallback to a very simple query
+          const simpleFallback = 'stars:>100';
+          console.log("Trying simpler fallback query:", simpleFallback);
+          
+          // Retry with simpler query
+          if (typeof window !== 'undefined') {
+            res = await fetch(`/api/github/repos?q=${encodeURIComponent(simpleFallback)}&page=${page}`, {
+              credentials: 'include'
+            });
+          } else {
+            res = await fetch(
+              `https://api.github.com/search/repositories?q=${encodeURIComponent(simpleFallback)}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
+              { headers: getHeaders(userToken) }
+            );
+          }
+          
+          if (!res.ok) {
+            // If even the fallback fails, throw error
+            throw new Error(`Failed to fetch repositories with fallback query: ${res.status} ${res.statusText}`);
+          }
+        } else {
+          throw new Error(`Failed to fetch repositories: ${res.status} ${res.statusText}`);
+        }
+      }
+      
+      // Parse the response
+      const data = await res.json();
+      const items = typeof window !== 'undefined' ? data.repositories : data.items;
+      
+      const filteredRepos = (items || []).filter(
+        (repo: GitHubRepo) =>
+          !BANNED_KEYWORDS.some(
+            (keyword) =>
+              repo.name.toLowerCase().includes(keyword) ||
+              (repo.description?.toLowerCase() || "").includes(keyword)
+          )
+      );
+      
+      // Create cache structure for this page if needed
+      if (!repoCache.popular[page]) {
+        repoCache.popular[page] = {};
+      }
+      
+      // Cache the results with the query-specific key
+      repoCache.popular[page][cacheKey] = {
+        data: filteredRepos,
+        timestamp: Date.now(),
+      };
+      
+      return filteredRepos;
+    } catch (error) {
+      console.error("Error fetching repositories:", error);
+      // Return empty array as fallback
+      return [];
     }
-    
-    // Add beginner-friendly filter if requested
-    if (beginnerFriendly && !searchQuery.includes('good-first')) {
-      // Use a more stable parameter to avoid 422 errors
-      searchQuery += ' good-first-issues:>0';
-    }
-    
-    // Using specific search query with minimum stars and issues/PRs
-    const res = await fetch(
-      `https://api.github.com/search/repositories?q=${encodeURIComponent(searchQuery)}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
-      { headers: getHeaders(userToken) }
-    );
-
-    if (!res.ok) {
-      throw new Error(`Failed to fetch repositories: ${res.status} ${res.statusText}`);
-    }
-
-    const data = await res.json();
-
-    const filteredRepos = (data.items || []).filter(
-      (repo: GitHubRepo) =>
-        !BANNED_KEYWORDS.some(
-          (keyword) =>
-            repo.name.toLowerCase().includes(keyword) ||
-            (repo.description?.toLowerCase() || "").includes(keyword)
-        )
-    );
-
-    // Create cache structure for this page if needed
-    if (!repoCache.popular[page]) {
-      repoCache.popular[page] = {};
-    }
-
-    // Cache the results with the query-specific key
-    repoCache.popular[page][cacheKey] = {
-      data: filteredRepos,
-      timestamp: Date.now(),
-    };
-
-    return filteredRepos;
   }
 
   /**
@@ -716,13 +768,43 @@
       const hasQuota = await checkRateLimit();
       if (!hasQuota) return [];
 
-      const res = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/contributors?per_page=${limit}`,
-        { headers: getHeaders(userToken) }
-      );
-      
-      if (!res.ok) return [];
-      return await res.json();
+      // For client-side requests, use our proxy API
+      if (typeof window !== 'undefined') {
+        try {
+          const res = await fetch(`/api/github/contributors?owner=${owner}&repo=${repo}&limit=${limit}`, {
+            credentials: 'include'
+          });
+          
+          if (!res.ok) {
+            console.error(`Error fetching contributors via proxy: ${res.status}`);
+            return [];
+          }
+          
+          const data = await res.json();
+          return data.contributors || [];
+        } catch (err) {
+          console.error("Failed to fetch contributors via proxy:", err);
+          return [];
+        }
+      } else {
+        // Server-side direct API call
+        try {
+          const res = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/contributors?per_page=${limit}`,
+            { headers: getHeaders(userToken) }
+          );
+          
+          if (!res.ok) {
+            console.error(`Error fetching contributors directly: ${res.status}`);
+            return [];
+          }
+          
+          return await res.json();
+        } catch (err) {
+          console.error("Failed to fetch contributors directly:", err);
+          return [];
+        }
+      }
     } catch (error) {
       console.error("Error fetching contributors:", error);
       return [];
@@ -831,33 +913,71 @@
       const hasQuota = await checkRateLimit();
       if (!hasQuota) return [];
       
-      // Build the query based on language and/or topics
-      let query = "is:public";
+      // Build a simpler query to avoid 400 errors
+      let query = "stars:>10";
       
+      // Add only the language for simplicity - using too many qualifiers leads to 422 errors
       if (language) {
         query += `+language:${language}`;
       }
       
-      // Add up to 3 topics to the query
-      const topTopics = topics.slice(0, 3);
-      if (topTopics.length > 0) {
-        topTopics.forEach(topic => {
-          query += `+topic:${topic}`;
-        });
+      // Add just one topic to the query if available to keep it simple
+      if (topics.length > 0) {
+        // Use only the first topic for more reliable results
+        const firstTopic = topics[0];
+        query += `+topic:${firstTopic}`;
       }
       
-      // Exclude the current repository
-      query += `+-repo:${excludeRepo}`;
-      
-      const res = await fetch(
-        `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${limit}`,
-        { headers: getHeaders(userToken) }
-      );
-      
-      if (!res.ok) return [];
-      
-      const data = await res.json();
-      return data.items || [];
+      // Make the API request
+      try {
+        // When on client-side, use our proxy API to avoid CORS issues
+        let res;
+        if (typeof window !== 'undefined') {
+          // Use our proxy API on client-side
+          res = await fetch(`/api/github/repos?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${limit}`, {
+            credentials: 'include'
+          });
+        } else {
+          // Direct API call on server-side
+          res = await fetch(
+            `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${limit}`,
+            { headers: getHeaders(userToken) }
+          );
+        }
+        
+        if (!res.ok) {
+          console.error(`GitHub API error fetching similar repos: ${res.status} ${res.statusText}`);
+          
+          // Try an even simpler fallback query if the first one fails
+          const fallbackQuery = language ? `language:${language}+stars:>50` : 'stars:>100';
+          
+          // Retry with simpler query
+          if (typeof window !== 'undefined') {
+            res = await fetch(`/api/github/repos?q=${encodeURIComponent(fallbackQuery)}&per_page=${limit}`, {
+              credentials: 'include'
+            });
+          } else {
+            res = await fetch(
+              `https://api.github.com/search/repositories?q=${encodeURIComponent(fallbackQuery)}&sort=stars&order=desc&per_page=${limit}`,
+              { headers: getHeaders(userToken) }
+            );
+          }
+          
+          if (!res.ok) return [];
+        }
+        
+        // Parse the response
+        const data = await res.json();
+        const items = typeof window !== 'undefined' ? data.repositories : data.items;
+        
+        // Filter out the current repository if it's somehow in the results
+        return (items || []).filter((repo: GitHubRepo) => 
+          repo.full_name !== excludeRepo
+        );
+      } catch (error) {
+        console.error("Error in fetch for similar repositories:", error);
+        return [];
+      }
     } catch (error) {
       console.error("Error fetching similar repositories:", error);
       return [];
