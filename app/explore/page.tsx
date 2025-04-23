@@ -35,12 +35,24 @@ export default function ExplorePage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  
+  // Form state - what the user is currently inputting
   const [searchTerm, setSearchTerm] = useState("");
   const [languageFilter, setLanguageFilter] = useState<string>("all");
   const [sizeFilter, setSizeFilter] = useState<string>("all");
   const [topicFilter, setTopicFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("relevance");
   const [beginnerFriendly, setBeginnerFriendly] = useState<boolean>(false);
+  
+  // Active filters - what's actually being applied to the search (only updated when form is submitted)
+  const [activeFilters, setActiveFilters] = useState({
+    searchTerm: "",
+    languageFilter: "all",
+    sizeFilter: "all",
+    topicFilter: "all",
+    sortBy: "relevance",
+    beginnerFriendly: false
+  });
   const [userPreferences, setUserPreferences] = useState<{
     interests: string[];
     skillLevel: string;
@@ -108,47 +120,96 @@ export default function ExplorePage() {
   const [rateLimitError, setRateLimitError] = useState(false);
   const [rateLimitMessage, setRateLimitMessage] = useState("");
 
-  // Fetch repositories with filters
-  useEffect(() => {
-    const fetchRepositories = async () => {
+  // Function to fetch repositories with active filters
+  const fetchRepositories = async (page = 1) => {
+    try {
+      setLoading(true);
+
+      // Import the GitHub API functions
+      const { fetchQualityRepos, processRepositoriesData } = await import(
+        "@/lib/github-api"
+      );
+
+      // Build the query string with active filters
+      let query = "";
+      
+      // Add language filter if selected
+      if (activeFilters.languageFilter !== "all") {
+        query += `language:${activeFilters.languageFilter.toLowerCase()} `;
+      }
+      
+      // Add topic filter if selected
+      if (activeFilters.topicFilter !== "all") {
+        query += `topic:${activeFilters.topicFilter} `;
+      }
+      
+      // Add search term if provided
+      if (activeFilters.searchTerm.trim()) {
+        query += activeFilters.searchTerm.trim();
+      }
+      
+      // Ensure we have some query
+      query = query.trim();
+
+      console.log("Searching with query:", query);
+      
       try {
-        setLoading(true);
+        // Fetch repositories with query
+        const fetchedRepos = await fetchQualityRepos(page, query, activeFilters.beginnerFriendly);
+        const processedRepos = await processRepositoriesData(fetchedRepos, {
+          maxRepos: 15,
+        });
 
-        // Import the GitHub API functions
-        const { fetchQualityRepos, processRepositoriesData } = await import(
-          "@/lib/github-api"
-        );
+        // Format repositories to match your interface
+        const formattedRepos = processedRepos.map((repo) => ({
+          id: repo.id,
+          repoId: repo.id,
+          name: repo.name,
+          owner: repo.owner,
+          fullName: `${repo.owner}/${repo.name}`,
+          description: repo.description,
+          language: repo.language,
+          stars:
+            typeof repo.stars === "string" ? parseInt(repo.stars) : repo.stars,
+          forks:
+            typeof repo.forks === "string" ? parseInt(repo.forks) : repo.forks,
+          issues:
+            typeof repo.issuesCount === "string"
+              ? parseInt(repo.issuesCount.replace(/[^\d]/g, "")) || 0
+              : repo.issuesCount || 0,
+          ownerAvatar: repo.ownerAvatar,
+          topics: repo.topics || [],
+          size:
+            typeof repo.size === "string"
+              ? parseInt(repo.size)
+              : repo.size || 0,
+          url: `https://github.com/${repo.owner}/${repo.name}`,
+          homepage: repo.homepage,
+          license: repo.license,
+          updatedAt: new Date(repo.updatedAt || Date.now()),
+          createdAt: new Date(repo.createdAt || Date.now()),
+        }));
 
-        // Build the query string with filters
-        let query = "";
-        
-        // Add language filter if selected
-        if (languageFilter !== "all") {
-          query += `language:${languageFilter.toLowerCase()} `;
+        if (page === 1) {
+          setRepositories(formattedRepos);
+        } else {
+          setRepositories(prev => [...prev, ...formattedRepos]);
         }
         
-        // Add topic filter if selected
-        if (topicFilter !== "all") {
-          query += `topic:${topicFilter} `;
-        }
+        setCurrentPage(page);
+        setHasMore(formattedRepos.length > 0);
+      } catch (apiError) {
+        console.error("GitHub API error:", apiError);
         
-        // Add search term if provided
-        if (searchTerm.trim()) {
-          query += searchTerm.trim();
-        }
-        
-        // Ensure we have some query
-        query = query.trim();
-        
-        // Fetch repositories with query (pass empty string to use defaults if no filters)
-        try {
-          // Fetch repositories with query
-          const fetchedRepos = await fetchQualityRepos(1, query, beginnerFriendly);
-          const processedRepos = await processRepositoriesData(fetchedRepos, {
-            maxRepos: 15,
+        // If there was an error with the specific query, try a basic fallback query
+        if (query) {
+          console.log("Trying fallback query...");
+          const fallbackRepos = await fetchQualityRepos(1, "", false);
+          const processedRepos = await processRepositoriesData(fallbackRepos, {
+            maxRepos: 10,
           });
 
-          // Format repositories to match your interface
+          // Process fallback repos
           const formattedRepos = processedRepos.map((repo) => ({
             id: repo.id,
             repoId: repo.id,
@@ -177,68 +238,27 @@ export default function ExplorePage() {
             updatedAt: new Date(repo.updatedAt || Date.now()),
             createdAt: new Date(repo.createdAt || Date.now()),
           }));
-
+          
           setRepositories(formattedRepos);
           setHasMore(true);
-        } catch (apiError) {
-          console.error("GitHub API error:", apiError);
-          
-          // If there was an error with the specific query, try a basic fallback query
-          if (query) {
-            console.log("Trying fallback query...");
-            const fallbackRepos = await fetchQualityRepos(1, "", false);
-            const processedRepos = await processRepositoriesData(fallbackRepos, {
-              maxRepos: 10,
-            });
-
-            // Process fallback repos
-            const formattedRepos = processedRepos.map((repo) => ({
-              id: repo.id,
-              repoId: repo.id,
-              name: repo.name,
-              owner: repo.owner,
-              fullName: `${repo.owner}/${repo.name}`,
-              description: repo.description,
-              language: repo.language,
-              stars:
-                typeof repo.stars === "string" ? parseInt(repo.stars) : repo.stars,
-              forks:
-                typeof repo.forks === "string" ? parseInt(repo.forks) : repo.forks,
-              issues:
-                typeof repo.issuesCount === "string"
-                  ? parseInt(repo.issuesCount.replace(/[^\d]/g, "")) || 0
-                  : repo.issuesCount || 0,
-              ownerAvatar: repo.ownerAvatar,
-              topics: repo.topics || [],
-              size:
-                typeof repo.size === "string"
-                  ? parseInt(repo.size)
-                  : repo.size || 0,
-              url: `https://github.com/${repo.owner}/${repo.name}`,
-              homepage: repo.homepage,
-              license: repo.license,
-              updatedAt: new Date(repo.updatedAt || Date.now()),
-              createdAt: new Date(repo.createdAt || Date.now()),
-            }));
-            
-            setRepositories(formattedRepos);
-            setHasMore(true);
-          } else {
-            throw apiError; // If fallback query also fails, re-throw the error
-          }
+        } else {
+          throw apiError; // If fallback query also fails, re-throw the error
         }
-      } catch (error) {
-        console.error("Error fetching repositories:", error);
-        // Fallback data in case of error
-        setRepositories([]);
-        setHasMore(false);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching repositories:", error);
+      // Fallback data in case of error
+      setRepositories([]);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchRepositories();
-  }, [languageFilter, topicFilter, beginnerFriendly, searchTerm]);
+  // Handle initial load
+  useEffect(() => {
+    fetchRepositories(1);
+  }, []);
 
   // Function to load more repositories
   const loadMoreRepositories = async () => {

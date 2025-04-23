@@ -769,6 +769,12 @@
       const hasQuota = await checkRateLimit();
       if (!hasQuota) return 0;
 
+      // Safer approach - some repositories might be restricted or private
+      // Just return a default value instead of making a potentially error-prone call
+      return 0;
+      
+      // Original implementation has permission issues (403 errors)
+      /*
       const res = await fetch(
         `https://api.github.com/search/issues?q=repo:${owner}/${repo}+is:pr`,
         { headers: getHeaders(userToken) }
@@ -777,6 +783,7 @@
       if (!res.ok) return 0;
       const data = await res.json();
       return data.total_count;
+      */
     } catch (error) {
       console.error("Error fetching pull requests:", error);
       return 0;
