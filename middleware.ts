@@ -21,20 +21,34 @@ const protectedPaths = [
   '/repository'
 ];
 
+// Auth-related paths that should never be intercepted by middleware
+const authPaths = [
+  '/api/auth',
+  '/api/session'
+];
+
 export async function middleware(request: NextRequest) {
-  const isAuthenticated = checkAuthFromCookies(request.cookies);
   const { pathname } = request.nextUrl;
+  
+  // Skip middleware for auth-related API routes
+  // This is critical to ensure OAuth callbacks work properly
+  if (authPaths.some(path => pathname.startsWith(path))) {
+    return NextResponse.next();
+  }
+  
+  // For auth-test page used for debugging, allow access regardless of auth status
+  if (pathname.startsWith('/auth-test')) {
+    return NextResponse.next();
+  }
+  
+  // Check authentication status from cookies
+  const isAuthenticated = checkAuthFromCookies(request.cookies);
   
   // Check if the current path is protected
   const isProtectedPath = protectedPaths.some(path => pathname.startsWith(path));
   
   // Check if the current path is the login page
   const isLoginPage = pathname === '/login';
-  
-  // For auth-test page used for debugging, allow access regardless of auth status
-  if (pathname.startsWith('/auth-test')) {
-    return NextResponse.next();
-  }
   
   // If the path is protected and the user is not authenticated, redirect to login
   if (isProtectedPath && !isAuthenticated) {
@@ -53,5 +67,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|images).*)'],
+  matcher: [
+    // Match all paths except static assets, images, and API routes
+    '/((?!_next/static|_next/image|favicon.ico|images|fonts).*)',
+  ],
 };

@@ -21,6 +21,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/login",
     error: "/", // Redirect to home page on error
   },
+  // Use standard NextAuth cookie settings
   cookies: {
     sessionToken: {
       name: `${process.env.NODE_ENV === "production" ? "__Secure-" : ""}next-auth.session-token`,
@@ -36,46 +37,31 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     GithubProvider({
       clientId: process.env.AUTH_GITHUB_ID || process.env.GITHUB_ID || "",
       clientSecret: process.env.AUTH_GITHUB_SECRET || process.env.GITHUB_SECRET || "",
+      // Simplified authorization config with only required scopes
       authorization: {
-        url: "https://github.com/login/oauth/authorize",
         params: {
-          // Specify what access we want for GitHub API authentication
-          // - read:user: Read user profile data
-          // - user:email: Access private email
-          // - repo: Full access to public and private repositories
-          // - public_repo: Limited access to public repositories only
-          scope: "read:user user:email repo public_repo",
-          // Add anti-caching timestamp to force new auth flow each time
-          t: Date.now().toString(),
-          // Ensure proper callback URL format
-          redirect_uri: process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL}/api/auth/callback/github` : undefined
+          scope: "read:user user:email"
         },
       },
-      // Custom profile function to extract all the data we need
+      // Simplified profile function with try/catch for error handling
       profile(profile, tokens) {
-        console.log("GitHub authentication successful for:", profile.login);
-        
-        // Log token existence and scopes (not the token itself for security)
-        const hasToken = !!tokens.access_token;
-        const tokenType = tokens.token_type || 'bearer';
-        const scopes = tokens.scope?.split(' ') || [];
-        
-        console.log(`GitHub auth token received: ${hasToken ? 'Yes' : 'No'}`);
-        console.log(`GitHub token type: ${tokenType}`);
-        console.log(`GitHub token scopes: ${scopes.join(', ')}`);
-        
-        return {
-          id: profile.id.toString(),
-          name: profile.name || profile.login,
-          email: profile.email,
-          image: profile.avatar_url,
-          // Store GitHub specific information for API authentication
-          githubUsername: profile.login,
-          githubAccessToken: tokens.access_token,
-          // Store additional token information for debugging
-          githubTokenType: tokenType,
-          githubTokenScopes: scopes,
-        };
+        try {
+          console.log("GitHub authentication successful for:", profile.login);
+          
+          // Basic info needed for user account
+          return {
+            id: profile.id.toString(),
+            name: profile.name || profile.login,
+            email: profile.email,
+            image: profile.avatar_url,
+            // Store GitHub specific information for API authentication
+            githubUsername: profile.login,
+            githubAccessToken: tokens.access_token,
+          };
+        } catch (error) {
+          console.error("Error in GitHub profile callback:", error);
+          throw error; // Re-throw to ensure NextAuth properly handles the error
+        }
       },
     }),
   ],

@@ -66,19 +66,25 @@ export const LoginForm = ({
       
       console.log("Starting GitHub sign in with callback URL:", callbackUrl);
       
-      // Ensure we're using the correct URL format
-      const baseUrl = window.location.origin;
-      
-      // Use GitHub signin with explicit redirect parameter
-      await signIn("github", { 
+      // Use GitHub signin with standard parameters and handle errors by returning results
+      const result = await signIn("github", {
         callbackUrl,
-        redirect: true,
-        // Add explicit redirect_uri to match GitHub OAuth app configuration
-        // This is a workaround for common OAuth configuration mismatches
-        redirect_uri: `${baseUrl}/api/auth/callback/github`
+        redirect: false // Don't auto-redirect so we can handle errors
       });
       
-      // The above will redirect, so any code below won't execute on success
+      console.log("SignIn result:", result);
+      
+      if (result?.error) {
+        // Handle specific error cases
+        toast.error(`Authentication error: ${result.error}`);
+        setSubmitting(false);
+      } else if (result?.url) {
+        // Successful login, manually redirect
+        window.location.href = result.url;
+      } else {
+        // Fallback for unexpected result format
+        window.location.href = callbackUrl || '/dashboard';
+      }
     } catch (error: any) {
       console.error("GitHub login error:", error);
       setSubmitting(false);
