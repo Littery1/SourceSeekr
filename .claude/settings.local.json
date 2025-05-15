@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(rg:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(chmod:*)",
+      "Bash(./deploy.sh)",
+      "Bash(bash:*)",
+      "Bash(npm run:*)"
     ],
     "deny": []
   }

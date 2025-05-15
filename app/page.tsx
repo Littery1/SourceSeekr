@@ -163,12 +163,12 @@ const PopularRepositoriesCarousel = () => {
                     src={currentRepo.ownerAvatar}
                     width={56}
                     height={56}
-                    alt={`${currentRepo.owner} avatar`}
+                    alt={`${typeof currentRepo.owner === 'object' ? currentRepo.owner.login : currentRepo.owner} avatar`}
                     className="rounded-full border-2 border-primary/20"
                   />
                   <div>
                     <Link
-                      href={`/repository/${currentRepo.owner}/${currentRepo.name}`}
+                      href={`/repository/${typeof currentRepo.owner === 'object' ? currentRepo.owner.login : currentRepo.owner}/${currentRepo.name}`}
                       className="font-medium text-xl hover:text-primary transition-colors"
                     >
                       {currentRepo.name}
@@ -176,7 +176,7 @@ const PopularRepositoriesCarousel = () => {
                     <div className="text-sm text-muted-foreground hover:text-foreground/80 transition-colors">
                       by{" "}
                       <span className="hover:text-primary transition-colors">
-                        {currentRepo.owner}
+                        {typeof currentRepo.owner === 'object' ? currentRepo.owner.login : currentRepo.owner}
                       </span>
                     </div>
                   </div>
@@ -311,13 +311,13 @@ const PopularRepositoriesCarousel = () => {
 
               <div className="flex justify-between">
                 <Link
-                  href={`/repository/${currentRepo.owner}/${currentRepo.name}`}
+                  href={`/repository/${typeof currentRepo.owner === 'object' ? currentRepo.owner.login : currentRepo.owner}/${currentRepo.name}`}
                   className="btn btn-primary flex-1 mr-2"
                 >
                   View Details
                 </Link>
                 <a
-                  href={`https://github.com/${currentRepo.owner}/${currentRepo.name}`}
+                  href={`https://github.com/${typeof currentRepo.owner === 'object' ? currentRepo.owner.login : currentRepo.owner}/${currentRepo.name}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-outline flex-1 ml-2"
@@ -493,12 +493,12 @@ export default function HomePage() {
             src={repo.ownerAvatar}
             width={44}
             height={44}
-            alt={`${repo.owner} avatar`}
+            alt={`${typeof repo.owner === 'object' ? repo.owner.login : repo.owner} avatar`}
             className="rounded-full border-2 border-primary/20 transition-all duration-200 group-hover:border-primary/60"
           />
           <div>
             <Link
-              href={`/repository/${repo.owner}/${repo.name}`}
+              href={`/repository/${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`}
               className="font-medium text-lg hover:text-primary transition-colors duration-200"
             >
               {repo.name}
@@ -506,7 +506,7 @@ export default function HomePage() {
             <div className="text-sm text-muted-foreground hover:text-foreground/80 transition-colors">
               by{" "}
               <span className="hover:text-primary transition-colors duration-200">
-                {repo.owner}
+                {typeof repo.owner === 'object' ? repo.owner.login : repo.owner}
               </span>
             </div>
           </div>
@@ -594,7 +594,7 @@ export default function HomePage() {
       </div>
 
       <Link
-        href={`/repository/${repo.owner}/${repo.name}`}
+        href={`/repository/${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`}
         className="btn btn-outline w-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
       >
         View Details

@@ -661,7 +661,7 @@ useEffect(() => {
           body: JSON.stringify({
             repoId: repository.id,
             name: repository.name,
-            owner: repository.owner,
+            owner: typeof repository.owner === 'object' ? repository.owner.login : repository.owner,
             fullName: repository.fullName,
             description: repository.description,
             language: repository.language,
@@ -671,7 +671,7 @@ useEffect(() => {
             ownerAvatar: repository.ownerAvatar,
             topics: repository.topics,
             size: repository.size,
-            url: `https://github.com/${repository.owner}/${repository.name}`,
+            url: `https://github.com/${typeof repository.owner === 'object' ? repository.owner.login : repository.owner}/${repository.name}`,
             homepage: repository.homepage,
             license: repository.license,
             updatedAt: repository.updatedAt,
@@ -791,7 +791,7 @@ useEffect(() => {
           <div className="flex items-center gap-4">
             <Image
               src={repository.ownerAvatar}
-              alt={`${owner} avatar`}
+              alt={`${typeof repository.owner === 'object' ? repository.owner.login : owner} avatar`}
               width={64}
               height={64}
               className="rounded-lg border-2 border-primary/20"
