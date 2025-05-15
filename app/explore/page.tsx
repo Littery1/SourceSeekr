@@ -188,7 +188,7 @@ export default function ExplorePage() {
             typeof repo.size === "string"
               ? parseInt(repo.size)
               : repo.size || 0,
-          url: `https://github.com/${repo.owner}/${repo.name}`,
+          url: `https://github.com/${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`,
           homepage: repo.homepage,
           license: repo.license,
           updatedAt: new Date(repo.updatedAt || Date.now()),
@@ -237,7 +237,7 @@ export default function ExplorePage() {
               typeof repo.size === "string"
                 ? parseInt(repo.size)
                 : repo.size || 0,
-            url: `https://github.com/${repo.owner}/${repo.name}`,
+            url: `https://github.com/${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`,
             homepage: repo.homepage,
             license: repo.license,
             updatedAt: new Date(repo.updatedAt || Date.now()),
@@ -263,7 +263,8 @@ export default function ExplorePage() {
   // Handle initial load
   useEffect(() => {
     fetchRepositories(1);
-  }, [fetchRepositories]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Function to load more repositories
   const loadMoreRepositories = async () => {
