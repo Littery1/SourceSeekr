@@ -33,25 +33,38 @@ export const LoginForm = ({
     }
   }, [session, status]);
 
-  // Handle signing out and switching accounts - simplified
+  // Handle signing out and switching accounts - improved implementation
   const handleSwitchAccount = async () => {
     try {
       // Show loading toast
       toast.loading("Signing out...");
       console.log("Starting sign out process");
       
-      // Use the standard NextAuth signOut with redirect
-      await signOut({ 
-        redirect: true,
-        callbackUrl: `/login?t=${Date.now()}`
+      // Add timestamp for cache busting
+      const timestamp = Date.now();
+      const callbackUrl = `/login?t=${timestamp}`;
+      
+      // Call our custom signout endpoint directly to avoid client-side errors
+      const response = await fetch(`/api/auth/signout?callbackUrl=${encodeURIComponent(callbackUrl)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Important for cookies
       });
       
-      // Note: We don't need any of the additional logic since signOut with redirect: true
-      // will handle the navigation and session cleanup properly
-      
+      if (response.ok) {
+        console.log("Successfully signed out, redirecting to", callbackUrl);
+        // Handle successful signout by redirecting in client code
+        window.location.href = callbackUrl;
+      } else {
+        throw new Error(`Signout failed with status: ${response.status}`);
+      }
     } catch (error) {
       console.error("Sign out error:", error);
       toast.error("Failed to sign out. Please try again.");
+      // Fallback - redirect to login page even if there was an error
+      window.location.href = `/login?error=signout_failed&t=${Date.now()}`;
     }
   };
 
@@ -81,11 +94,18 @@ export const LoginForm = ({
       const effectiveCallbackUrl = `${callbackUrl || '/dashboard'}?t=${timestamp}`;
       console.log("Using callback URL with timestamp:", effectiveCallbackUrl);
       
-      // Allow NextAuth to handle the redirect - simpler and more reliable
-      await signIn("github", { 
-        callbackUrl: effectiveCallbackUrl,
-        redirect: true
-      });
+      try {
+        // Allow NextAuth to handle the redirect - simpler and more reliable
+        await signIn("github", { 
+          callbackUrl: effectiveCallbackUrl,
+          redirect: true
+        });
+      } catch (signInError) {
+        console.error("Error during signIn:", signInError);
+        // Fall back to manual redirect
+        window.location.href = `/api/auth/signin/github?callbackUrl=${encodeURIComponent(effectiveCallbackUrl)}`;
+        return;
+      }
       
       // The code below will only execute if there was a client-side error before the redirect
       console.log("WARNING: Code after signIn executed - this shouldn't happen with redirect: true");
