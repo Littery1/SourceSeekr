@@ -170,8 +170,8 @@ export default function ExplorePage() {
           id: repo.id,
           repoId: repo.id,
           name: repo.name,
-          owner: repo.owner,
-          fullName: `${repo.owner}/${repo.name}`,
+          owner: typeof repo.owner === 'object' ? repo.owner.login : repo.owner,
+          fullName: `${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`,
           description: repo.description,
           language: repo.language,
           stars:
@@ -219,8 +219,8 @@ export default function ExplorePage() {
             id: repo.id,
             repoId: repo.id,
             name: repo.name,
-            owner: repo.owner,
-            fullName: `${repo.owner}/${repo.name}`,
+            owner: typeof repo.owner === 'object' ? repo.owner.login : repo.owner,
+            fullName: `${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`,
             description: repo.description,
             language: repo.language,
             stars:
@@ -433,7 +433,7 @@ export default function ExplorePage() {
           body: JSON.stringify({
             repoId: repo.id,
             name: repo.name,
-            owner: repo.owner,
+            owner: typeof repo.owner === 'object' ? repo.owner.login : repo.owner,
             fullName: repo.fullName,
             description: repo.description,
             language: repo.language,
