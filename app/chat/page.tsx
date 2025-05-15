@@ -26,10 +26,30 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [gitHubData, setGitHubData] = useState<GitHubData[]>([]);
   const [rateLimitedResponses, setRateLimitedResponses] = useState<Set<number>>(new Set());
+  const [authChecking, setAuthChecking] = useState(true); // Track if we're still checking auth status
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Check authentication status and redirect if not authenticated
+  useEffect(() => {
+    // When status changes from loading to either authenticated or unauthenticated
+    if (status !== "loading") {
+      if (status === "unauthenticated") {
+        console.log("User not authenticated, redirecting to login");
+        // Add cache-busting parameter to prevent caching issues
+        const timestamp = Date.now();
+        const callbackUrl = encodeURIComponent(`/chat?t=${timestamp}`);
+        router.push(`/login?callbackUrl=${callbackUrl}`);
+      }
+      // Authentication check completed
+      setAuthChecking(false);
+    }
+  }, [status, router]);
   
   // Add initial welcome message from the assistant and load previous messages from localStorage
   useEffect(() => {
+    // Only proceed if user is authenticated or loading
+    if (status === "unauthenticated") return;
+    
     // Try to load saved messages from localStorage
     const savedMessages = localStorage.getItem('chatMessages');
     
@@ -313,6 +333,16 @@ export default function ChatPage() {
     </div>
   );
 
+  // Show loading state while checking authentication
+  if (authChecking) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-muted-foreground">Verifying authentication...</p>
+      </div>
+    );
+  }
+  
   return (
     <div className="flex flex-col h-[calc(100vh-10rem)] max-w-4xl mx-auto">
       <div className="flex flex-col items-center mb-6">

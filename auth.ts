@@ -6,11 +6,14 @@ console.log("NextAuth initialization - Environment:");
 console.log("- NODE_ENV:", process.env.NODE_ENV);
 console.log("- NEXTAUTH_URL:", process.env.NEXTAUTH_URL);
 console.log("- NEXTAUTH_SECRET exists:", !!process.env.NEXTAUTH_SECRET);
+if (process.env.NEXTAUTH_SECRET) {
+  console.log("- NEXTAUTH_SECRET length:", process.env.NEXTAUTH_SECRET.length);
+}
 console.log("- GitHub ID exists:", !!(process.env.AUTH_GITHUB_ID || process.env.GITHUB_ID));
 console.log("- GitHub Secret exists:", !!(process.env.AUTH_GITHUB_SECRET || process.env.GITHUB_SECRET));
 
-// Minimal configuration to isolate issues
-export const { handlers, auth, signIn, signOut } = NextAuth({
+// Centralized authOptions for reuse across the application
+export const authOptions = {
   // Always enable debug mode to catch issues
   debug: true,
   
@@ -85,4 +88,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     }
   }
-});
+};
+
+// Initialize NextAuth with the authOptions
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);

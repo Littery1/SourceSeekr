@@ -33,32 +33,25 @@ export const LoginForm = ({
     }
   }, [session, status]);
 
-  // Handle clearing existing session
-  const handleClearSession = async () => {
+  // Handle signing out and switching accounts - simplified
+  const handleSwitchAccount = async () => {
     try {
       // Show loading toast
       toast.loading("Signing out...");
       console.log("Starting sign out process");
       
-      // First try the proper NextAuth signOut
+      // Use the standard NextAuth signOut with redirect
       await signOut({ 
-        redirect: false
+        redirect: true,
+        callbackUrl: `/login?t=${Date.now()}`
       });
       
-      // Then also clear any other client-side state
-      await clearAuthState();
-      
-      // After both operations complete, redirect with cache-busting
-      console.log("Sign out completed, redirecting");
-      const redirectUrl = `/login?t=${Date.now()}`;
-      window.location.href = redirectUrl;
+      // Note: We don't need any of the additional logic since signOut with redirect: true
+      // will handle the navigation and session cleanup properly
       
     } catch (error) {
       console.error("Sign out error:", error);
-      toast.error("Failed to clear session. Please try again.");
-      
-      // Full page reload as last resort
-      window.location.href = `/login?error=signout_failed&t=${Date.now()}`;
+      toast.error("Failed to sign out. Please try again.");
     }
   };
 
@@ -74,23 +67,10 @@ export const LoginForm = ({
         timestamp: new Date().toISOString() 
       });
       
-      // If there's an existing session, clear it completely (including GitHub's session)
+      // If there's an existing session, just use the switch account function
       if (sessionDetected) {
-        console.log("Existing session detected, clearing it first");
-        toast.loading("Preparing to switch accounts...");
-        
-        // First use built-in signOut with redirect:false to clear server-side session
-        await signOut({ redirect: false }); 
-        console.log("NextAuth signOut completed");
-        
-        // Then clear client-side storage
-        await clearAuthState();
-        console.log("Client-side auth state cleared");
-        
-        // Then redirect to GitHub logout with cache-busting
-        const timestamp = Date.now();
-        console.log("Redirecting to GitHub logout with timestamp:", timestamp);
-        window.location.href = `/api/auth/github-logout?callbackUrl=/login&t=${timestamp}`;
+        console.log("Existing session detected, using switch account flow");
+        await handleSwitchAccount();
         return; // Stop execution here as we're redirecting
       }
       
@@ -141,14 +121,21 @@ export const LoginForm = ({
         <div className="flex flex-col gap-3">
           <button 
             className="btn btn-primary" 
-            onClick={() => router.push(callbackUrl)}
+            onClick={() => {
+              // Add cache-busting parameter to prevent caching issues
+              const timestamp = Date.now();
+              const url = callbackUrl.includes('?') 
+                ? `${callbackUrl}&t=${timestamp}` 
+                : `${callbackUrl}?t=${timestamp}`;
+              router.push(url);
+            }}
           >
             Continue with current account
           </button>
           
           <button 
             className="btn btn-outline" 
-            onClick={handleClearSession}
+            onClick={handleSwitchAccount}
             disabled={submitting}
           >
             {submitting ? "Signing out..." : "Switch to a different account"}
