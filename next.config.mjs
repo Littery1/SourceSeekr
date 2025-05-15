@@ -43,7 +43,10 @@ const nextConfig = {
   },
   // Disable Edge Runtime for routes using Prisma
   experimental: {
-    serverComponentsExternalPackages: ["@prisma/client", "@auth/prisma-adapter"],
+    instrumentationHook: false, // Disable instrumentation hook to avoid Edge runtime issues
+    serverComponentsExternalPackages: ["@prisma/client", "@auth/prisma-adapter", "bcryptjs"],
+    // Explicitly specify middleware to run in Node.js runtime
+    runtime: 'nodejs',
   },
   typescript: {
     // Similarly to ESLint, this is to ignore TypeScript errors during build
