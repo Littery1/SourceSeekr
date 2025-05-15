@@ -46,7 +46,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // - public_repo: Limited access to public repositories only
           scope: "read:user user:email repo public_repo",
           // Add anti-caching timestamp to force new auth flow each time
-          t: Date.now().toString()
+          t: Date.now().toString(),
+          // Ensure proper callback URL format
+          redirect_uri: process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL}/api/auth/callback/github` : undefined
         },
       },
       // Custom profile function to extract all the data we need

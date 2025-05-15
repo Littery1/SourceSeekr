@@ -9,6 +9,7 @@ export function checkAuthFromCookies(cookies: { get: (name: string) => { value?:
     cookies.get('next-auth.session-token')?.value || 
     cookies.get('__Secure-next-auth.session-token')?.value ||
     cookies.get('__Host-next-auth.session-token')?.value ||
+    cookies.get('next-auth.callback-url')?.value || // Check for callback URL cookie
     cookies.get('next-auth.session-token.0')?.value ||
     cookies.get('__Secure-next-auth.session-token.0')?.value;
   

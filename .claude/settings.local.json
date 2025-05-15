@@ -6,7 +6,9 @@
       "Bash(chmod:*)",
       "Bash(./deploy.sh)",
       "Bash(bash:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

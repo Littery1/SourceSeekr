@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -120,8 +120,8 @@ export default function ExplorePage() {
   const [rateLimitError, setRateLimitError] = useState(false);
   const [rateLimitMessage, setRateLimitMessage] = useState("");
 
-  // Function to fetch repositories with active filters
-  const fetchRepositories = async (page = 1) => {
+  // Function to fetch repositories with active filters - wrapped in useCallback to prevent re-creation
+  const fetchRepositories = useCallback(async (page = 1) => {
     try {
       setLoading(true);
 
@@ -258,16 +258,20 @@ export default function ExplorePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeFilters]);
 
-  // Handle initial load
-  useEffect(() => {
+  // Handle initial load - using useCallback to prevent recreation of function
+  const fetchInitialRepositories = useCallback(() => {
     fetchRepositories(1);
+  }, [fetchRepositories]);
+
+  useEffect(() => {
+    fetchInitialRepositories();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Function to load more repositories
-  const loadMoreRepositories = async () => {
+  // Function to load more repositories - using useCallback
+  const loadMoreRepositories = useCallback(async () => {
     if (loadingMore || !hasMore) return;
 
     try {
@@ -279,7 +283,7 @@ export default function ExplorePage() {
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [loadingMore, hasMore, currentPage, fetchRepositories]);
 
   // Filter and sort repositories based on search term and other filters
   const filteredAndSortedRepos = repositories

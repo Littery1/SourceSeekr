@@ -66,9 +66,16 @@ export const LoginForm = ({
       
       console.log("Starting GitHub sign in with callback URL:", callbackUrl);
       
-      // Use GitHub signin - with cleaner parameters
+      // Ensure we're using the correct URL format
+      const baseUrl = window.location.origin;
+      
+      // Use GitHub signin with explicit redirect parameter
       await signIn("github", { 
-        callbackUrl
+        callbackUrl,
+        redirect: true,
+        // Add explicit redirect_uri to match GitHub OAuth app configuration
+        // This is a workaround for common OAuth configuration mismatches
+        redirect_uri: `${baseUrl}/api/auth/callback/github`
       });
       
       // The above will redirect, so any code below won't execute on success
