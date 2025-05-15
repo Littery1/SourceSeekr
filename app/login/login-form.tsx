@@ -54,41 +54,45 @@ export const LoginForm = ({
     try {
       setSubmitting(true);
       
+      // Log current session state
+      console.log("Login attempt - Current session state:", { 
+        status, 
+        sessionDetected, 
+        callbackUrl 
+      });
+      
       // If there's an existing session, clear it completely (including GitHub's session)
       if (sessionDetected) {
-        // First make sure local session is cleared
-        await clearAuthState();
+        console.log("Existing session detected, clearing it first");
+        
+        // First make sure local session is cleared - use signOut directly
+        await signOut({ redirect: false }); 
         
         // Then redirect to GitHub logout, which will redirect back to login
+        console.log("Redirecting to GitHub logout");
         window.location.href = '/api/auth/github-logout?callbackUrl=/login';
         return; // Stop execution here as we're redirecting
       }
       
-      console.log("Starting GitHub sign in with callback URL:", callbackUrl);
+      console.log("Starting GitHub sign in flow");
       
-      // Use GitHub signin with standard parameters and handle errors by returning results
-      const result = await signIn("github", {
-        callbackUrl,
-        redirect: false // Don't auto-redirect so we can handle errors
+      // CRITICAL: Don't use redirect: false for OAuth providers like GitHub
+      // This ensures the full OAuth redirect flow works as expected
+      await signIn("github", { 
+        callbackUrl: callbackUrl || '/dashboard',
+        // Allow NextAuth to handle the redirect - simpler and more reliable
+        redirect: true
       });
       
-      console.log("SignIn result:", result);
+      // The code below will only execute if redirect: false was used
+      // or if there was a client-side error before the redirect happened
+      console.log("Warning: Code after signIn executed - this shouldn't happen with redirect: true");
       
-      if (result?.error) {
-        // Handle specific error cases
-        toast.error(`Authentication error: ${result.error}`);
-        setSubmitting(false);
-      } else if (result?.url) {
-        // Successful login, manually redirect
-        window.location.href = result.url;
-      } else {
-        // Fallback for unexpected result format
-        window.location.href = callbackUrl || '/dashboard';
-      }
     } catch (error: any) {
-      console.error("GitHub login error:", error);
+      // This will only catch client-side errors, not server-side issues
+      console.error("Critical client-side error during GitHub login:", error);
       setSubmitting(false);
-      toast.error(error.message || "Failed to log in with GitHub");
+      toast.error("A critical error occurred while trying to connect to GitHub. Please try again.");
     }
   };
 

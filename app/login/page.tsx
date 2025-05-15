@@ -44,17 +44,27 @@ export default async function LoginPage({
         </div>
           
           {error && (
-            <div className="alert alert-error">
-              <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="mb-6 p-4 border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900/50 rounded-lg flex items-start gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <span>
-                {error === "OAuthSignin" && "Error starting sign in"}
-                {error === "OAuthCallback" && "Error during callback"}
-                {error === "OAuthAccountNotLinked" && "Email already used with different provider"}
-                {error === "CredentialsSignin" && "Invalid credentials"}
-                {!["OAuthSignin", "OAuthCallback", "OAuthAccountNotLinked", "CredentialsSignin"].includes(error) && "Authentication error"}
-              </span>
+              <div>
+                <p className="font-medium text-red-600 dark:text-red-400">Authentication Error</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {error === "OAuthSignin" && "Error starting the GitHub sign-in process. Please try again."}
+                  {error === "OAuthCallback" && "Error during the GitHub callback. This could be due to a configuration issue or network problem."}
+                  {error === "OAuthCreateAccount" && "Error creating your account with GitHub credentials."}
+                  {error === "OAuthAccountNotLinked" && "This email is already associated with a different account or provider."}
+                  {error === "SessionRequired" && "You need to be signed in to access this page."}
+                  {error === "Callback" && "Error during the sign-in callback. Please try again or contact support."}
+                  {error === "logout_failed" && "Failed to completely log out. Please try clearing your browser cache."}
+                  {!["OAuthSignin", "OAuthCallback", "OAuthCreateAccount", "OAuthAccountNotLinked", "SessionRequired", "Callback", "logout_failed"].includes(error) && 
+                    `Authentication error (${error}). Please try again or contact support if the issue persists.`}
+                </p>
+                <p className="text-xs mt-2 text-gray-500 dark:text-gray-500">
+                  <Link href="/" className="underline hover:text-primary">Return to home page</Link> or try signing in again after a few minutes.
+                </p>
+              </div>
             </div>
           )}
           
