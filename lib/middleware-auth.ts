@@ -3,8 +3,12 @@
  * that don't rely on Prisma directly, avoiding Edge Runtime restrictions
  */
 
+import { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
+
 /**
  * Checks if the user is authenticated based on cookies
+ * More robust method that tries multiple approaches for compatibility
  * 
  * @param cookies Request cookies
  * @returns True if authenticated, false otherwise
@@ -42,5 +46,36 @@ export function checkAuthFromCookies(cookies: { get: (name: string) => { value?:
     // Safety fallback - if there's any error, assume not authenticated
     console.error('Error checking auth cookies:', error);
     return false;
+  }
+}
+
+/**
+ * More robust auth check that verifies the JWT token
+ * Use this in middleware instead of the simpler cookie check
+ * 
+ * @param request The NextRequest object
+ * @returns Promise resolving to true if authenticated, false otherwise
+ */
+export async function verifyAuthToken(request: NextRequest): Promise<boolean> {
+  try {
+    // Use next-auth's getToken to validate the token
+    const token = await getToken({ 
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET
+    });
+    
+    const isAuthenticated = !!token;
+    
+    // Log authentication status in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('JWT token verified, authenticated:', isAuthenticated);
+    }
+    
+    return isAuthenticated;
+  } catch (error) {
+    console.error('Error verifying auth token:', error);
+    
+    // Fallback to basic cookie check if JWT verification fails
+    return checkAuthFromCookies(request.cookies);
   }
 }

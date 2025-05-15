@@ -36,17 +36,29 @@ export const LoginForm = ({
   // Handle clearing existing session
   const handleClearSession = async () => {
     try {
-      // Use our utility function to clear auth state
-      await clearAuthState('/login');
+      // Show loading toast
+      toast.loading("Signing out...");
+      console.log("Starting sign out process");
       
-      // If the page hasn't reloaded already, show a success message
-      toast.success("Previous session cleared. You can now sign in with a different account.");
+      // First try the proper NextAuth signOut
+      await signOut({ 
+        redirect: false
+      });
+      
+      // Then also clear any other client-side state
+      await clearAuthState();
+      
+      // After both operations complete, redirect with cache-busting
+      console.log("Sign out completed, redirecting");
+      const redirectUrl = `/login?t=${Date.now()}`;
+      window.location.href = redirectUrl;
+      
     } catch (error) {
       console.error("Sign out error:", error);
-      toast.error("Failed to clear previous session. Please try again.");
+      toast.error("Failed to clear session. Please try again.");
       
-      // Fallback to client-side signOut
-      await signOut({ redirect: true, callbackUrl: '/login' });
+      // Full page reload as last resort
+      window.location.href = `/login?error=signout_failed&t=${Date.now()}`;
     }
   };
 
@@ -54,39 +66,49 @@ export const LoginForm = ({
     try {
       setSubmitting(true);
       
-      // Log current session state
+      // Add detailed logging
       console.log("Login attempt - Current session state:", { 
         status, 
         sessionDetected, 
-        callbackUrl 
+        callbackUrl,
+        timestamp: new Date().toISOString() 
       });
       
       // If there's an existing session, clear it completely (including GitHub's session)
       if (sessionDetected) {
         console.log("Existing session detected, clearing it first");
+        toast.loading("Preparing to switch accounts...");
         
-        // First make sure local session is cleared - use signOut directly
+        // First use built-in signOut with redirect:false to clear server-side session
         await signOut({ redirect: false }); 
+        console.log("NextAuth signOut completed");
         
-        // Then redirect to GitHub logout, which will redirect back to login
-        console.log("Redirecting to GitHub logout");
-        window.location.href = '/api/auth/github-logout?callbackUrl=/login';
+        // Then clear client-side storage
+        await clearAuthState();
+        console.log("Client-side auth state cleared");
+        
+        // Then redirect to GitHub logout with cache-busting
+        const timestamp = Date.now();
+        console.log("Redirecting to GitHub logout with timestamp:", timestamp);
+        window.location.href = `/api/auth/github-logout?callbackUrl=/login&t=${timestamp}`;
         return; // Stop execution here as we're redirecting
       }
       
       console.log("Starting GitHub sign in flow");
       
-      // CRITICAL: Don't use redirect: false for OAuth providers like GitHub
-      // This ensures the full OAuth redirect flow works as expected
+      // Add cache-busting to the callbackUrl
+      const timestamp = Date.now();
+      const effectiveCallbackUrl = `${callbackUrl || '/dashboard'}?t=${timestamp}`;
+      console.log("Using callback URL with timestamp:", effectiveCallbackUrl);
+      
+      // Allow NextAuth to handle the redirect - simpler and more reliable
       await signIn("github", { 
-        callbackUrl: callbackUrl || '/dashboard',
-        // Allow NextAuth to handle the redirect - simpler and more reliable
+        callbackUrl: effectiveCallbackUrl,
         redirect: true
       });
       
-      // The code below will only execute if redirect: false was used
-      // or if there was a client-side error before the redirect happened
-      console.log("Warning: Code after signIn executed - this shouldn't happen with redirect: true");
+      // The code below will only execute if there was a client-side error before the redirect
+      console.log("WARNING: Code after signIn executed - this shouldn't happen with redirect: true");
       
     } catch (error: any) {
       // This will only catch client-side errors, not server-side issues
@@ -127,8 +149,9 @@ export const LoginForm = ({
           <button 
             className="btn btn-outline" 
             onClick={handleClearSession}
+            disabled={submitting}
           >
-            Switch to a different account
+            {submitting ? "Signing out..." : "Switch to a different account"}
           </button>
         </div>
       </div>
