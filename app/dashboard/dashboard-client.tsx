@@ -306,7 +306,7 @@ export default function DashboardClient({ session }: { session: Session }) {
                         href={`/repository/${String(repo.owner)}/${String(repo.name)}`}
                         className="hover:text-primary transition-colors"
                       >
-                        {repo.owner}/{repo.name}
+                        {typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/{repo.name}
                       </Link>
                     </h2>
                     <p className="text-muted-foreground mb-2">
