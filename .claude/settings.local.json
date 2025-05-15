@@ -8,7 +8,8 @@
       "Bash(bash:*)",
       "Bash(npm run:*)",
       "Bash(cat:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   }

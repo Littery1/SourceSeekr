@@ -6,7 +6,6 @@ import toast from "react-hot-toast";
 import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { clearAuthState } from '@/lib/auth-utils';
 
 export type LoginFormProps = {
   callbackUrl?: string;
@@ -21,11 +20,8 @@ export const LoginForm = ({
   const { data: session, status } = useSession();
   
   const [submitting, setSubmitting] = useState(false);
-  // We no longer need this state for email login
   const [sessionDetected, setSessionDetected] = useState(hasExistingSession);
   
-  // We don't need forms anymore as we're only using GitHub login
-
   // Update session detection if session status changes
   useEffect(() => {
     if (status === 'authenticated' && session) {
@@ -44,22 +40,11 @@ export const LoginForm = ({
       const timestamp = Date.now();
       const callbackUrl = `/login?t=${timestamp}`;
       
-      // Call our custom signout endpoint directly to avoid client-side errors
-      const response = await fetch(`/api/auth/signout?callbackUrl=${encodeURIComponent(callbackUrl)}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Important for cookies
-      });
+      // Call our custom GitHub logout endpoint for better reliability
+      const logoutUrl = `/api/auth/github-logout?callbackUrl=${encodeURIComponent(callbackUrl)}`;
       
-      if (response.ok) {
-        console.log("Successfully signed out, redirecting to", callbackUrl);
-        // Handle successful signout by redirecting in client code
-        window.location.href = callbackUrl;
-      } else {
-        throw new Error(`Signout failed with status: ${response.status}`);
-      }
+      console.log("Redirecting to logout URL:", logoutUrl);
+      window.location.href = logoutUrl;
     } catch (error) {
       console.error("Sign out error:", error);
       toast.error("Failed to sign out. Please try again.");
@@ -117,8 +102,6 @@ export const LoginForm = ({
       toast.error("A critical error occurred while trying to connect to GitHub. Please try again.");
     }
   };
-
-  // No longer needed - using only GitHub auth
 
   // If a session is detected, show warning and option to switch accounts
   if (sessionDetected) {

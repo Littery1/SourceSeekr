@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
-import { SessionProvider } from "next-auth/react";
+import SessionProviderWrapper from "@/components/SessionProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import Navbar from "@/components/Navbar/page";
 
@@ -22,10 +22,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider>
-          <SessionProvider 
-            refetchInterval={0} 
-            refetchOnWindowFocus={false}
-          >
+          <SessionProviderWrapper>
             <div className="min-h-screen flex flex-col">
               <Navbar />
               <main className="flex-1 container mx-auto px-4 py-8">
@@ -64,7 +61,7 @@ export default function RootLayout({
               </footer>
             </div>
             <Toaster position="bottom-right" />
-          </SessionProvider>
+          </SessionProviderWrapper>
         </ThemeProvider>
       </body>
     </html>
