@@ -2,6 +2,8 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import DashboardClient from "./dashboard-client";
 
+export const runtime = 'nodejs'; // 'edge' is not supported by Prisma
+
 export default async function DashboardPage() {
   const session = await auth();
   

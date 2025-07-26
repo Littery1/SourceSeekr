@@ -47,29 +47,8 @@ export default function Navbar() {
   };
 
   const handleLogout = async () => {
-    try {
-      toast.loading("Signing out...");
-      
-      // Clear local storage items first
-      await clearAuthState();
-      
-      // Manual fetch to our server-side signout endpoint to ensure cookies are cleared
-      await fetch("/api/auth/signout", {
-        method: "GET",
-        credentials: "include",
-      });
-      
-      // Force a client-side redirect
-      window.location.href = "/";
-      
-    } catch (error: any) {
-      toast.dismiss();
-      console.error("Logout error:", error);
-      toast.error(error.message || "Logout failed");
-      
-      // Fallback to direct window reload
-      window.location.reload();
-    }
+    // The built-in signOut handles everything: clearing cookies, session, and redirecting.
+    await signOut({ callbackUrl: '/' }); 
   };
 
   const navLinks = [

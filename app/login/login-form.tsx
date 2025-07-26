@@ -31,76 +31,21 @@ export const LoginForm = ({
 
   // Handle signing out and switching accounts - improved implementation
   const handleSwitchAccount = async () => {
-    try {
-      // Show loading toast
-      toast.loading("Signing out...");
-      console.log("Starting sign out process");
-      
-      // Add timestamp for cache busting
-      const timestamp = Date.now();
-      const callbackUrl = `/login?t=${timestamp}`;
-      
-      // Call our custom GitHub logout endpoint for better reliability
-      const logoutUrl = `/api/auth/github-logout?callbackUrl=${encodeURIComponent(callbackUrl)}`;
-      
-      console.log("Redirecting to logout URL:", logoutUrl);
-      window.location.href = logoutUrl;
-    } catch (error) {
-      console.error("Sign out error:", error);
-      toast.error("Failed to sign out. Please try again.");
-      // Fallback - redirect to login page even if there was an error
-      window.location.href = `/login?error=signout_failed&t=${Date.now()}`;
-    }
+    setSubmitting(true);
+    // Simply sign out. The user will remain on the login page.
+    // Then they can sign in with a different account.
+    await signOut({ redirect: false }); 
+    setSessionDetected(false); // Update state to show the main login button again
+    setSubmitting(false);
+    toast.success("Signed out. You can now sign in with a different account.");
   };
 
   const handleGitHubLogin = async () => {
-    try {
-      setSubmitting(true);
-      
-      // Add detailed logging
-      console.log("Login attempt - Current session state:", { 
-        status, 
-        sessionDetected, 
-        callbackUrl,
-        timestamp: new Date().toISOString() 
-      });
-      
-      // If there's an existing session, just use the switch account function
-      if (sessionDetected) {
-        console.log("Existing session detected, using switch account flow");
-        await handleSwitchAccount();
-        return; // Stop execution here as we're redirecting
-      }
-      
-      console.log("Starting GitHub sign in flow");
-      
-      // Add cache-busting to the callbackUrl
-      const timestamp = Date.now();
-      const effectiveCallbackUrl = `${callbackUrl || '/dashboard'}?t=${timestamp}`;
-      console.log("Using callback URL with timestamp:", effectiveCallbackUrl);
-      
-      try {
-        // Allow NextAuth to handle the redirect - simpler and more reliable
-        await signIn("github", { 
-          callbackUrl: effectiveCallbackUrl,
-          redirect: true
-        });
-      } catch (signInError) {
-        console.error("Error during signIn:", signInError);
-        // Fall back to manual redirect
-        window.location.href = `/api/auth/signin/github?callbackUrl=${encodeURIComponent(effectiveCallbackUrl)}`;
-        return;
-      }
-      
-      // The code below will only execute if there was a client-side error before the redirect
-      console.log("WARNING: Code after signIn executed - this shouldn't happen with redirect: true");
-      
-    } catch (error: any) {
-      // This will only catch client-side errors, not server-side issues
-      console.error("Critical client-side error during GitHub login:", error);
-      setSubmitting(false);
-      toast.error("A critical error occurred while trying to connect to GitHub. Please try again.");
-    }
+    setSubmitting(true);
+    // This is all you need. NextAuth handles the rest.
+    await signIn("github", { callbackUrl });
+    // The line below will likely not be reached due to redirect.
+    setSubmitting(false);
   };
 
   // If a session is detected, show warning and option to switch accounts

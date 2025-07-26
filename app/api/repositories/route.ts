@@ -5,6 +5,8 @@ import { getRepositories, storeRepositories, getRepositoriesCount, isRepositoryS
 import { auth } from '@/auth';
 import { getPersonalizedRepositories } from '@/lib/deepseek-service';
 
+export const runtime = 'nodejs'; // 'edge' is not supported by Prisma
+
 // Mock function for getting GitHub user profile data
 // In a real implementation, this would fetch data from GitHub API
 async function getGitHubUserProfile(userId: string) {
@@ -49,8 +51,7 @@ async function getGitHubUserProfile(userId: string) {
 }
 
 // Import Prisma client for database operations
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import prisma from '@/prisma/prisma';
 
 export async function GET(req: NextRequest) {
   try {

@@ -4,6 +4,8 @@ import prisma from "@/prisma/prisma";
 import { createUserSchema } from "@/lib/user-schema";
 import { ZodError } from "zod";
 
+export const runtime = 'nodejs'; // 'edge' is not supported by Prisma
+
 export async function POST(req: Request) {
   try {
     const { name, email, password } = createUserSchema.parse(await req.json());

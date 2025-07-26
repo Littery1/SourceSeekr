@@ -1,58 +1,92 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/prisma/prisma';
 
-const prisma = new PrismaClient();
+export const runtime = 'nodejs'; // 'edge' is not supported by Prisma
 
-// PATCH handler to update notes for a saved repository
-export async function PATCH(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    // Get the current session
+    const { searchParams } = new URL(req.url);
+    const repositoryId = searchParams.get('repositoryId');
+    
     const session = await auth();
     
-    // Check if the user is authenticated
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // Parse the request body
-    const body = await request.json();
-    const { id, notes } = body;
-    
-    if (!id) {
-      return NextResponse.json({ error: 'Repository ID is required' }, { status: 400 });
+    if (!repositoryId) {
+      return NextResponse.json(
+        { error: 'Repository ID is required' },
+        { status: 400 }
+      );
     }
     
-    // Find the repository to ensure it belongs to the current user
-    const repo = await prisma.savedRepository.findFirst({
+    // Get the saved repository with notes
+    const savedRepo = await prisma.savedRepository.findUnique({
       where: {
-        id,
-        userId: session.user.id,
+        userId_repositoryId: {
+          userId: session.user.id,
+          repositoryId
+        }
       },
+      select: {
+        notes: true
+      }
     });
     
-    if (!repo) {
-      return NextResponse.json({ error: 'Repository not found or access denied' }, { status: 404 });
+    if (!savedRepo) {
+      return NextResponse.json(
+        { error: 'Repository not found in saved list' },
+        { status: 404 }
+      );
     }
     
-    // Update the notes
+    return NextResponse.json({ notes: savedRepo.notes });
+  } catch (error) {
+    console.error('Error fetching repository notes:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch repository notes' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const { repositoryId, notes } = await req.json();
+    const session = await auth();
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    if (!repositoryId) {
+      return NextResponse.json(
+        { error: 'Repository ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    // Update the notes for the saved repository
     const updatedRepo = await prisma.savedRepository.update({
       where: {
-        id,
+        userId_repositoryId: {
+          userId: session.user.id,
+          repositoryId
+        }
       },
       data: {
-        notes,
-        updatedAt: new Date(),
-      },
+        notes
+      }
     });
     
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Notes updated successfully', 
-      repository: updatedRepo 
-    });
+    return NextResponse.json(updatedRepo);
   } catch (error) {
     console.error('Error updating repository notes:', error);
-    return NextResponse.json({ error: 'Failed to update notes' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to update repository notes' },
+      { status: 500 }
+    );
   }
 }
