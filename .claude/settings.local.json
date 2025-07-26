@@ -12,5 +12,6 @@
       "Bash(mkdir:*)"
     ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": false
 }
