@@ -9,7 +9,10 @@
       "Bash(npm run:*)",
       "Bash(cat:*)",
       "Bash(ls:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(pnpm add:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   },

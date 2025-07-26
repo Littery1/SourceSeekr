@@ -1,24 +1,38 @@
-import NextAuth from "next-auth";
+import NextAuth, {
+  type Session,
+  type Account,
+  type Profile,
+  type User,
+} from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "./prisma/prisma";
+import prisma from "./prisma/prisma";
 
-// Enable verbose debugging (will appear in Vercel logs)
-console.log("NextAuth initialization - Environment:");
-console.log("- NODE_ENV:", process.env.NODE_ENV);
-console.log("- NEXTAUTH_URL:", process.env.NEXTAUTH_URL);
-console.log("- AUTH_URL:", process.env.AUTH_URL);
-console.log("- NEXTAUTH_SECRET exists:", !!process.env.NEXTAUTH_SECRET);
-console.log("- AUTH_SECRET exists:", !!process.env.AUTH_SECRET);
-console.log("- GitHub ID exists:", !!(process.env.AUTH_GITHUB_ID || process.env.GITHUB_ID));
-console.log("- GitHub Secret exists:", !!(process.env.AUTH_GITHUB_SECRET || process.env.GITHUB_SECRET));
+// --- Environment Variable Validation ---
+// This ensures that the required variables are present at runtime.
+const GITHUB_CLIENT_ID = process.env.AUTH_GITHUB_ID;
+const GITHUB_CLIENT_SECRET = process.env.AUTH_GITHUB_SECRET;
+const AUTH_SECRET = process.env.AUTH_SECRET;
+
+if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
+  throw new Error(
+    "Missing GitHub OAuth credentials (AUTH_GITHUB_ID or AUTH_GITHUB_SECRET)"
+  );
+}
+
+if (!AUTH_SECRET) {
+  throw new Error("Missing AUTH_SECRET environment variable");
+}
+
+console.log("NextAuth initialization - Environment checks passed.");
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     GitHub({
-      clientId: process.env.AUTH_GITHUB_ID || process.env.GITHUB_ID || "",
-      clientSecret: process.env.AUTH_GITHUB_SECRET || process.env.GITHUB_SECRET || "",
+      // By using the validated constants, TypeScript knows these are strings.
+      clientId: GITHUB_CLIENT_ID,
+      clientSecret: GITHUB_CLIENT_SECRET,
       // Force GitHub to always show the authorization dialog for "login with different account"
       authorization: {
         params: {
@@ -33,7 +47,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             name: profile.name,
             email: !!profile.email, // Just log whether email exists
           });
-          
+
           return {
             id: profile.id.toString(),
             name: profile.name || profile.login,
@@ -59,22 +73,39 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     updateAge: 24 * 60 * 60, // Update sessions every 24 hours
   },
   callbacks: {
-    async session({ session, user }) {
+    async session({ session, user }: { session: Session; user: User }) {
       console.log("Session Callback - creating session with user ID");
-      
+
       // Add the user ID to the session
-      if (session.user) {
+      // The `user.id` check satisfies TypeScript's strict null checks.
+      if (session.user && user.id) {
         session.user.id = user.id;
       }
-      
+
       return session;
     },
-    async signIn({ user, account, profile }) {
+    async signIn({
+      user,
+      account,
+      profile,
+    }: {
+      user: User;
+      account: Account | null;
+      profile?: Profile;
+    }) {
       console.log("SignIn Callback - processing GitHub login");
-      
+
       if (account?.provider === "github") {
+        if (!user.email) {
+          console.warn(
+            "GitHub user email is null. Sign-in cannot proceed without an email."
+          );
+          return false; // Prevent sign-in if email is not available
+        }
+
         const existingUser = await prisma.user.findUnique({
-          where: { email: user.email! },
+          // The check above guarantees user.email is not null, so the '!' is not needed.
+          where: { email: user.email },
         });
 
         if (!existingUser) {
@@ -84,29 +115,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           console.log(`Existing user signing in via GitHub: ${user.email}`);
         }
       }
-      
+
       return true; // Allow the sign in
     },
-    // Redirect logic for signin/signout
-    redirect({ url, baseUrl }) {
+    redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
       console.log("Redirect Callback - handling redirect", { url, baseUrl });
-      
+
       // If the URL starts with the base URL or is a relative URL, allow it
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       else if (new URL(url).origin === baseUrl) return url;
-      
+
       // Otherwise redirect to the base URL
       return baseUrl;
-    }
+    },
   },
   events: {
-    async createUser({ user }) {
+    async createUser({ user }: { user: User }) {
       console.log(`New user created: ${user.id}, email: ${user.email}`);
     },
-    async signIn({ user }) {
+    async signIn({ user }: { user: User }) {
       console.log(`User signed in: ${user.id}`);
     },
-    async signOut({ session }) {
+    async signOut({ session }: { session: Session }) {
       console.log(`User signed out`);
     },
   },
@@ -115,8 +145,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signOut: "/",
     error: "/login", // Redirect to login page on error with error parameter
   },
-  // Secret for signing cookies and tokens - use AUTH_SECRET or fallback to NEXTAUTH_SECRET
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-  // Always enable debug mode 
+  // Secret for signing cookies and tokens
+  secret: AUTH_SECRET,
+  // Always enable debug mode
   debug: true,
 });

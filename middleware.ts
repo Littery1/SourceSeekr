@@ -1,12 +1,27 @@
-import { auth } from "./auth"
+import { auth } from "./auth";
+import { NextResponse } from 'next/server';
 
-// The middleware is now just an export from the auth function.
-// All logic for protecting routes will be handled by redirecting
-// in server components or checking session status in client components.
-export default auth;
+export default auth((req) => {
+  const isLoggedIn = !!req.auth;
+  const { nextUrl } = req;
 
-// This config is crucial. It tells the middleware to run on ALMOST all paths,
-// EXCEPT for specific ones that should always be public (like API routes, static files).
+  // Define routes that require authentication
+  const protectedRoutes = ['/dashboard', '/profile', '/saved', '/chat'];
+
+  const isProtectedRoute = protectedRoutes.some(path => nextUrl.pathname.startsWith(path));
+
+  if (isProtectedRoute && !isLoggedIn) {
+    // Redirect unauthenticated users to the login page
+    // Preserve the original URL they tried to access as a callbackUrl
+    const loginUrl = new URL("/login", nextUrl.origin);
+    loginUrl.searchParams.set("callbackUrl", nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
+});
+
+// This config ensures the middleware runs on all paths except for static assets and API routes.
 export const config = {
   matcher: [
     /*
@@ -19,4 +34,4 @@ export const config = {
      */
     '/((?!api|_next/static|_next/image|favicon.ico|images).*)',
   ],
-}
+};
