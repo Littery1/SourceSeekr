@@ -502,16 +502,16 @@ export default function HomePage() {
             src={repo.ownerAvatar}
             width={44}
             height={44}
-            alt={`${getOwnerLogin(repo.owner as any)} avatar`}
+            alt={`${repo.owner} avatar`}
             className="rounded-full border-2 border-primary/20 transition-all duration-200 group-hover:border-primary/60"
           />
           <div>
             <Link
-              href={`/repository/${getOwnerLogin(repo.owner as any)}/${
-                repo.name
-              }`}
+              href={`/repository/${repo.owner}/${repo.name}`}
               className="font-medium text-lg hover:text-primary transition-colors duration-200"
-            ></Link>
+            >
+              {repo.name}
+            </Link>
             <div className="text-sm text-muted-foreground hover:text-foreground/80 transition-colors">
               by{" "}
               <span className="hover:text-primary transition-colors duration-200">
@@ -634,7 +634,8 @@ export default function HomePage() {
         {/* Animated Code Background */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-background via-background/80 to-background/30 z-10"></div>
-          <pre className="absolute text-xs text-primary/10 whitespace-pre-wrap opacity-30 transform rotate-12 top-[-100px] left-[-50px] w-[200%] pointer-events-none">
+          <pre className="absolute text-xs text-primary/20 dark:text-primary/10 whitespace-pre-wrap opacity-30 transform rotate-12 top-[-100px] left-[-50px] w-[200%] pointer-events-none">
+            {" "}
             {`
 import { useState, useEffect } from 'react';
 import { octokit } from './github';
