@@ -11,6 +11,11 @@ import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ProcessedRepo } from "@/lib/github-api";
 
+// Helper function to safely get the owner's login name
+const getOwnerLogin = (owner: string | { login: string }): string => {
+  return typeof owner === "string" ? owner : owner?.login || "";
+};
+
 // Repository Carousel Component
 const PopularRepositoriesCarousel = () => {
   const [repos, setRepos] = useState<ProcessedRepo[]>([]);
@@ -20,7 +25,7 @@ const PopularRepositoriesCarousel = () => {
   const [savedRepos, setSavedRepos] = useState<Set<string>>(new Set());
 
   const { data: session } = useSession();
-  
+
   useEffect(() => {
     // Load saved repositories from localStorage
     const loadSavedRepos = () => {
@@ -42,14 +47,14 @@ const PopularRepositoriesCarousel = () => {
         setLoading(true);
 
         // Use our server-side API to avoid CORS issues
-        const response = await fetch('/api/github/repos?type=popular&limit=5');
-        
+        const response = await fetch("/api/github/repos?type=popular&limit=5");
+
         if (!response.ok) {
           throw new Error(`Failed to fetch repositories: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
+
         if (data.success && data.data) {
           setRepos(data.data);
         } else {
@@ -163,20 +168,20 @@ const PopularRepositoriesCarousel = () => {
                     src={currentRepo.ownerAvatar}
                     width={56}
                     height={56}
-                    alt={`${typeof currentRepo.owner === 'object' ? currentRepo.owner.login : currentRepo.owner} avatar`}
+                    alt={`${getOwnerLogin(currentRepo.owner)} avatar`}
                     className="rounded-full border-2 border-primary/20"
                   />
                   <div>
                     <Link
-                      href={`/repository/${typeof currentRepo.owner === 'object' ? currentRepo.owner.login : currentRepo.owner}/${currentRepo.name}`}
+                      href={`/repository/${getOwnerLogin(currentRepo.owner)}/${
+                        currentRepo.name
+                      }`}
                       className="font-medium text-xl hover:text-primary transition-colors"
-                    >
-                      {currentRepo.name}
-                    </Link>
+                    ></Link>
                     <div className="text-sm text-muted-foreground hover:text-foreground/80 transition-colors">
                       by{" "}
                       <span className="hover:text-primary transition-colors">
-                        {typeof currentRepo.owner === 'object' ? currentRepo.owner.login : currentRepo.owner}
+                        {getOwnerLogin(currentRepo.owner)}
                       </span>
                     </div>
                   </div>
@@ -311,13 +316,17 @@ const PopularRepositoriesCarousel = () => {
 
               <div className="flex justify-between">
                 <Link
-                  href={`/repository/${typeof currentRepo.owner === 'object' ? currentRepo.owner.login : currentRepo.owner}/${currentRepo.name}`}
+                  href={`/repository/${getOwnerLogin(currentRepo.owner)}/${
+                    currentRepo.name
+                  }`}
                   className="btn btn-primary flex-1 mr-2"
                 >
                   View Details
                 </Link>
                 <a
-                  href={`https://github.com/${typeof currentRepo.owner === 'object' ? currentRepo.owner.login : currentRepo.owner}/${currentRepo.name}`}
+                  href={`https://github.com/${getOwnerLogin(
+                    currentRepo.owner
+                  )}/${currentRepo.name}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-outline flex-1 ml-2"
@@ -493,20 +502,20 @@ export default function HomePage() {
             src={repo.ownerAvatar}
             width={44}
             height={44}
-            alt={`${typeof repo.owner === 'object' ? repo.owner.login : repo.owner} avatar`}
+            alt={`${getOwnerLogin(repo.owner as any)} avatar`}
             className="rounded-full border-2 border-primary/20 transition-all duration-200 group-hover:border-primary/60"
           />
           <div>
             <Link
-              href={`/repository/${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`}
+              href={`/repository/${getOwnerLogin(repo.owner as any)}/${
+                repo.name
+              }`}
               className="font-medium text-lg hover:text-primary transition-colors duration-200"
-            >
-              {repo.name}
-            </Link>
+            ></Link>
             <div className="text-sm text-muted-foreground hover:text-foreground/80 transition-colors">
               by{" "}
               <span className="hover:text-primary transition-colors duration-200">
-                {typeof repo.owner === 'object' ? repo.owner.login : repo.owner}
+                {getOwnerLogin(repo.owner as any)}
               </span>
             </div>
           </div>
@@ -594,7 +603,7 @@ export default function HomePage() {
       </div>
 
       <Link
-        href={`/repository/${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`}
+        href={`/repository/${getOwnerLogin(repo.owner as any)}/${repo.name}`}
         className="btn btn-outline w-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
       >
         View Details
@@ -608,7 +617,7 @@ export default function HomePage() {
       <Suspense fallback={null}>
         <AuthErrorHandler />
       </Suspense>
-      
+
       {/* Background Elements for Visual Interest */}
       {mounted ? (
         <>

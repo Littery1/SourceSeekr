@@ -27,7 +27,10 @@ interface Repository {
   updatedAt: Date;
   createdAt: Date;
 }
-
+// Helper function to safely get the owner's login name
+const getOwnerLogin = (owner: string | { login: string }): string => {
+  return typeof owner === 'string' ? owner : owner?.login || '';
+};
 export default function ExplorePage() {
   const { data: session } = useSession();
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -160,7 +163,11 @@ export default function ExplorePage() {
       
       try {
         // Fetch repositories with query
-        const fetchedRepos = await fetchQualityRepos(page, query, activeFilters.beginnerFriendly);
+        const fetchedRepos = await fetchQualityRepos(
+          page,
+          query,
+          activeFilters.beginnerFriendly
+        );
         const processedRepos = await processRepositoriesData(fetchedRepos, {
           maxRepos: 15,
         });
@@ -170,8 +177,8 @@ export default function ExplorePage() {
           id: repo.id,
           repoId: repo.id,
           name: repo.name,
-          owner: typeof repo.owner === 'object' ? repo.owner.login : repo.owner,
-          fullName: `${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`,
+          owner: getOwnerLogin(repo.owner),
+          fullName: `${getOwnerLogin(repo.owner)}/${repo.name}`,
           description: repo.description,
           language: repo.language,
           stars:
@@ -188,7 +195,9 @@ export default function ExplorePage() {
             typeof repo.size === "string"
               ? parseInt(repo.size)
               : repo.size || 0,
-          url: `https://github.com/${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`,
+          url: `https://github.com/${
+            typeof repo.owner === "object" ? repo.owner.login : repo.owner
+          }/${repo.name}`,
           homepage: repo.homepage,
           license: repo.license,
           updatedAt: new Date(repo.updatedAt || Date.now()),
@@ -198,9 +207,9 @@ export default function ExplorePage() {
         if (page === 1) {
           setRepositories(formattedRepos);
         } else {
-          setRepositories(prev => [...prev, ...formattedRepos]);
+          setRepositories((prev) => [...prev, ...formattedRepos]);
         }
-        
+
         setCurrentPage(page);
         setHasMore(formattedRepos.length > 0);
       } catch (apiError) {
@@ -432,14 +441,13 @@ export default function ExplorePage() {
         const res = await fetch("/api/repositories/saved", {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
           },
-          credentials: 'include',
+          credentials: "include",
           body: JSON.stringify({
             repoId: repo.id,
             name: repo.name,
-            owner: typeof repo.owner === 'object' ? repo.owner.login : repo.owner,
-            fullName: repo.fullName,
+            owner: repo.owner, // The owner is already a string here because of our mapping            fullName: repo.fullName,
             description: repo.description,
             language: repo.language,
             stars: repo.stars,
@@ -452,7 +460,7 @@ export default function ExplorePage() {
             homepage: repo.homepage,
             license: repo.license,
             updatedAt: repo.updatedAt,
-            createdAt: repo.createdAt
+            createdAt: repo.createdAt,
           }),
         });
 
@@ -532,20 +540,23 @@ export default function ExplorePage() {
 
       {/* Filters and Search */}
       <div className="bg-card border border-border rounded-xl p-6 mb-8 relative z-10">
-        <form onSubmit={(e) => {
-              e.preventDefault();
-              // Set active filters from current form values when submitted
-              setActiveFilters({
-                searchTerm,
-                languageFilter,
-                sizeFilter,
-                topicFilter,
-                sortBy,
-                beginnerFriendly
-              });
-              // Fetch repositories with new filters
-              fetchRepositories(1);
-            }} className="flex flex-col gap-6">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            // Set active filters from current form values when submitted
+            setActiveFilters({
+              searchTerm,
+              languageFilter,
+              sizeFilter,
+              topicFilter,
+              sortBy,
+              beginnerFriendly,
+            });
+            // Fetch repositories with new filters
+            fetchRepositories(1);
+          }}
+          className="flex flex-col gap-6"
+        >
           {/* Search */}
           <div className="relative">
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
@@ -645,19 +656,21 @@ export default function ExplorePage() {
           {/* Toggle for beginner-friendly */}
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="beginnerFriendly"
-              checked={beginnerFriendly}
-              onChange={(e) => setBeginnerFriendly(e.target.checked)}
-              className="mr-2 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <label htmlFor="beginnerFriendly" className="text-sm font-medium">
-              Show only beginner-friendly repositories (good documentation and
-              labeled issues)
-            </label>
+              <input
+                type="checkbox"
+                id="beginnerFriendly"
+                checked={beginnerFriendly}
+                onChange={(e) => setBeginnerFriendly(e.target.checked)}
+                className="mr-2 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <label htmlFor="beginnerFriendly" className="text-sm font-medium">
+                Show only beginner-friendly repositories (good documentation and
+                labeled issues)
+              </label>
             </div>
-            <button type="submit" className="btn btn-primary">Apply Filters</button>
+            <button type="submit" className="btn btn-primary">
+              Apply Filters
+            </button>
           </div>
         </form>
       </div>
@@ -778,7 +791,7 @@ export default function ExplorePage() {
                           href={`/repository/${repo.owner}/${repo.name}`}
                           className="hover:text-primary transition-colors"
                         >
-                          {typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/{repo.name}
+                          {repo.owner}/{repo.name}
                         </Link>
                         {repo.topics.some(
                           (topic) =>
@@ -938,12 +951,20 @@ export default function ExplorePage() {
                     </a>
                     <button
                       onClick={() => handleSaveRepository(repo.id)}
-                      className={`btn ${savedRepoIds.includes(repo.id) ? 'btn-primary' : 'btn-ghost'} btn-sm flex-1 flex items-center justify-center`}
+                      className={`btn ${
+                        savedRepoIds.includes(repo.id)
+                          ? "btn-primary"
+                          : "btn-ghost"
+                      } btn-sm flex-1 flex items-center justify-center`}
                       disabled={!session}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        fill={savedRepoIds.includes(repo.id) ? "currentColor" : "none"}
+                        fill={
+                          savedRepoIds.includes(repo.id)
+                            ? "currentColor"
+                            : "none"
+                        }
                         viewBox="0 0 24 24"
                         strokeWidth={1.5}
                         stroke="currentColor"
@@ -955,7 +976,7 @@ export default function ExplorePage() {
                           d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
                         />
                       </svg>
-                      {savedRepoIds.includes(repo.id) ? 'Saved' : 'Save'}
+                      {savedRepoIds.includes(repo.id) ? "Saved" : "Save"}
                     </button>
                   </div>
                 </div>

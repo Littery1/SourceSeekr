@@ -1,5 +1,5 @@
 // @/lib/deepseek-api.ts
-import { formatNumber } from './github-api';
+import { formatNumber, type ProcessedRepo } from "./github-api";
 
 interface UserPreferences {
   interests: string[];
@@ -8,59 +8,42 @@ interface UserPreferences {
   preferredLanguages: string[];
 }
 
-interface Repository {
-  id: number;
-  name: string;
-  fullName: string;
-  description: string | null;
-  stars: string;
-  forks: string;
-  pullRequests: string;
-  issuesCount: string;
-  issues: string[];
-  language: string | null;
-  ownerAvatar: string;
-  owner: string;
-  contributors: any[];
-  topics: string[];
-  homepage: string | null;
-  createdAt: string;
-  updatedAt: string;
-  license: string | null;
-  size: number;
-  readme: string | null;
-  defaultBranch: string;
-}
+
 
 // This is a mock function that would actually connect to Deepseek in a real implementation
 export async function getRecommendedRepositories(
   userPreferences: UserPreferences,
   count = 5,
   githubToken?: string | null
-): Promise<Repository[]> {
+): Promise<ProcessedRepo[]> {
   // This would be a real API call to Deepseek
   // For now, we'll simulate by filtering repositories
   
   try {
     // Import GitHub API functions
-    const { searchRepositories, processRepositoriesData, checkRateLimit, GitHubRateLimitError } = await import('./github-api');
-    
+    const {
+      searchRepositories,
+      processRepositoriesData,
+      checkRateLimit,
+      GitHubRateLimitError,
+    } = await import("./github-api");
+
     // Check rate limit first with token
     const hasQuota = await checkRateLimit(githubToken);
     if (!hasQuota) {
       throw new GitHubRateLimitError();
     }
-    
+
     // Build a query based on user preferences
     let query = "";
-    
+
     // Add languages
     if (userPreferences.preferredLanguages.length > 0) {
-      userPreferences.preferredLanguages.slice(0, 3).forEach(lang => {
+      userPreferences.preferredLanguages.slice(0, 3).forEach((lang) => {
         query += `language:${lang.toLowerCase()} `;
       });
     }
-    
+
     // Add topics based on interests
     if (userPreferences.interests.length > 0) {
       // Map interests to GitHub topics
@@ -70,72 +53,73 @@ export async function getRecommendedRepositories(
         "Data Science": "data-science",
         "Machine Learning": "machine-learning",
         "Game Development": "game",
-        "DevOps": "devops",
-        "Security": "security",
-        "Backend": "backend",
-        "Frontend": "frontend",
+        DevOps: "devops",
+        Security: "security",
+        Backend: "backend",
+        Frontend: "frontend",
         "UI/UX": "ui",
         "Cloud Computing": "cloud",
-        "Blockchain": "blockchain",
-        "IoT": "iot",
-        "AR/VR": "ar-vr"
+        Blockchain: "blockchain",
+        IoT: "iot",
+        "AR/VR": "ar-vr",
       };
-      
-      userPreferences.interests.slice(0, 2).forEach(interest => {
+
+      userPreferences.interests.slice(0, 2).forEach((interest) => {
         if (interestToTopic[interest]) {
           query += `topic:${interestToTopic[interest]} `;
         }
       });
     }
-    
+
     // Add skill level considerations
     if (userPreferences.skillLevel === "beginner") {
       query += "good-first-issues:>0 ";
     }
-    
+
     // Add considerations based on what they're looking for
     if (userPreferences.looking.includes("Documentation")) {
       query += "topic:documentation ";
     }
-    
+
     if (userPreferences.looking.includes("Beginner Friendly")) {
       query += "topic:beginner-friendly ";
     }
-    
+
     if (userPreferences.looking.includes("Open Source Projects")) {
       query += "is:public ";
     }
-    
+
     // If query is still empty, use a default
     if (!query.trim()) {
       query = "stars:>100";
     }
-    
+
     // Add default sorting and ensure we get active projects
     query += "sort:stars";
-    
+
     // Perform the search with token
     const repos = await searchRepositories(query.trim(), 1, githubToken);
-    
+
     // Check for rate limit again before processing (which makes multiple API calls)
     const stillHasQuota = await checkRateLimit(githubToken);
     if (!stillHasQuota) {
       throw new GitHubRateLimitError();
     }
-    
+
     // Process the results (limit to 5 to reduce API calls) with token
     return await processRepositoriesData(repos.slice(0, 5), {
-      userToken: githubToken
+      maxRepos: count,
+      // Corrected: Convert null to undefined to match the expected type
+      userToken: githubToken || undefined,
     });
   } catch (error) {
     console.error("Error getting Deepseek recommendations:", error);
     return [];
   }
 }
-
 // Generate a personalized explanation for why a repository is recommended
 export function getRecommendationReason(
-  repo: Repository,
+  repo: ProcessedRepo,
   userPreferences: UserPreferences
 ): string {
   const reasons = [];

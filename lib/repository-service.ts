@@ -17,29 +17,37 @@ export interface RepoFilter {
  */
 export async function storeRepository(repo: ProcessedRepo): Promise<void> {
   const topicsArray = Array.isArray(repo.topics) ? repo.topics : [];
-  
+
+  // Helper to safely extract the owner's login string
+  const ownerLogin =
+    typeof repo.owner === "string" ? repo.owner : repo.owner.login;
+
   await prisma.repository.upsert({
     where: {
       repoId: repo.id,
     },
     update: {
-      stars: parseInt(repo.stars.replace('k', '000').replace('M', '000000')),
-      forks: parseInt(repo.forks.replace('k', '000').replace('M', '000000')),
-      issues: parseInt(repo.issuesCount.replace('k', '000').replace('M', '000000')),
+      stars: parseInt(repo.stars.replace("k", "000").replace("M", "000000")),
+      forks: parseInt(repo.forks.replace("k", "000").replace("M", "000000")),
+      issues: parseInt(
+        repo.issuesCount.replace("k", "000").replace("M", "000000")
+      ),
       description: repo.description || "",
       topics: topicsArray,
       lastFetchedAt: new Date(),
     },
     create: {
       repoId: repo.id,
-      owner: repo.owner,
+      owner: ownerLogin, // Corrected: Use the extracted string value
       name: repo.name,
       fullName: repo.fullName,
       description: repo.description || "",
       language: repo.language,
-      stars: parseInt(repo.stars.replace('k', '000').replace('M', '000000')),
-      forks: parseInt(repo.forks.replace('k', '000').replace('M', '000000')),
-      issues: parseInt(repo.issuesCount.replace('k', '000').replace('M', '000000')),
+      stars: parseInt(repo.stars.replace("k", "000").replace("M", "000000")),
+      forks: parseInt(repo.forks.replace("k", "000").replace("M", "000000")),
+      issues: parseInt(
+        repo.issuesCount.replace("k", "000").replace("M", "000000")
+      ),
       ownerAvatar: repo.ownerAvatar,
       topics: topicsArray,
       size: repo.size,

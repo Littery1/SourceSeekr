@@ -61,7 +61,7 @@
     issues: { title: string; number: number; html_url: string }[];
     language: string | null;
     ownerAvatar: string;
-    owner: string;
+    owner: string | { login: string };
     contributors: Contributor[];
     topics: string[];
     homepage: string | null;
@@ -121,13 +121,13 @@
   }
 
   interface RepoCache {
-    popular: Record<number, CacheItem<GitHubRepo[]>>;
+    // CORRECTED: The structure now has a nested record for the cacheKey string.
+    popular: Record<number, Record<string, CacheItem<GitHubRepo[]>>>;
     trending: Record<number, CacheItem<GitHubRepo[]>>;
     byId: Record<string, CacheItem<ProcessedRepo>>;
     byFullName: Record<string, CacheItem<ProcessedRepo>>;
     searchResults: Record<string, CacheItem<GitHubRepo[]>>;
   }
-
   // Initialize the cache
   const repoCache: RepoCache = {
     popular: {},
@@ -396,18 +396,19 @@
   /**
    * Fetch popular repositories based on stars, with optional query and filters
    */
-  export async function fetchQualityRepos(page = 1, query: string = '', beginnerFriendly: boolean = false, userToken?: string | null): Promise<GitHubRepo[]> {
+  export async function fetchQualityRepos(
+    page = 1,
+    query: string = "",
+    beginnerFriendly: boolean = false,
+    userToken?: string | null
+  ): Promise<GitHubRepo[]> {
     // Create a cache key based on parameters
-    const cacheKey = `${query}_${beginnerFriendly ? 'beginner' : 'all'}_${page}`;
-    
-    // Create a structure for storing different query results
-    if (!repoCache.popular[page]) {
-      repoCache.popular[page] = {};
-    }
-    
-    // Return cached repos if available and valid
-    if (repoCache.popular[page][cacheKey] && isCacheValid(repoCache.popular[page][cacheKey])) {
-      return repoCache.popular[page][cacheKey].data;
+    const cacheKey = `${query}_${beginnerFriendly ? "beginner" : "all"}`;
+
+    // CORRECTED: Safely access the nested cache object
+    const cachedEntry = repoCache.popular[page]?.[cacheKey];
+    if (cachedEntry && isCacheValid(cachedEntry)) {
+      return cachedEntry.data;
     }
 
     // Check rate limit first with user token
@@ -417,110 +418,97 @@
     }
 
     // Build search query, starting with simpler default
-    let searchQuery = 'stars:>50';
-    
-    // If a custom query is provided, use it instead of the default
-    if (query && query.trim() !== '') {
-      searchQuery = query.trim();
-    }
-    
-    // Ensure the query doesn't get too complex - GitHub API has limitations
-    let queryParts = [];
-    
-    // Only add language if specified and no language already in the query
-    if (!searchQuery.includes('language:')) {
-      // Use language filter from preferences or current filter
-      let language = 'javascript';
-      
+    let searchQuery = query.trim() || "stars:>50";
+
+    let queryParts = [searchQuery];
+
+    if (!searchQuery.includes("language:")) {
+      let language = "javascript";
       try {
-        // If the user has preferences in localStorage, use those instead
-        if (typeof window !== 'undefined') {
-          const savedPreferences = localStorage.getItem('sourceseekr-preferences');
+        if (typeof window !== "undefined") {
+          const savedPreferences = localStorage.getItem(
+            "sourceseekr-preferences"
+          );
           if (savedPreferences) {
             const prefs = JSON.parse(savedPreferences);
-            if (prefs.preferredLanguages && prefs.preferredLanguages.length > 0) {
+            if (prefs.preferredLanguages?.length > 0) {
               language = prefs.preferredLanguages[0].toLowerCase();
             }
           }
         }
       } catch (e) {
-        console.error('Error parsing preferences:', e);
+        console.error("Error parsing preferences:", e);
       }
-      
-      // Create a clean query with minimal complexity
-      queryParts.push(searchQuery);
       queryParts.push(`language:${language}`);
-    } else {
-      // Keep the query as is if it already has language specification
-      queryParts.push(searchQuery);
     }
-    
-    // Add beginner-friendly filter if requested and not already in query
-    if (beginnerFriendly && !searchQuery.includes('good-first-issues')) {
-      queryParts.push('good-first-issues:>0');
+
+    if (beginnerFriendly && !searchQuery.includes("good-first-issues")) {
+      queryParts.push("good-first-issues:>0");
     }
-    
-    // Combine query parts
-    let finalQuery = queryParts.join(' ').trim();
-    
-    // If query is empty after processing, use a default query
+
+    let finalQuery = queryParts.join(" ").trim();
     if (!finalQuery) {
       finalQuery = "stars:>100";
     }
-    
+
     console.log("GitHub search query:", finalQuery);
-    
-    // Make the API request
+
     try {
-      // When on client-side, use our proxy API to avoid CORS issues
       let res;
-      if (typeof window !== 'undefined') {
-        // Use our proxy API on client-side
-        res = await fetch(`/api/github/repos?q=${encodeURIComponent(finalQuery)}&page=${page}`, {
-          credentials: 'include'
-        });
-      } else {
-        // Direct API call on server-side
+      if (typeof window !== "undefined") {
         res = await fetch(
-          `https://api.github.com/search/repositories?q=${encodeURIComponent(finalQuery)}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
+          `/api/github/repos?q=${encodeURIComponent(finalQuery)}&page=${page}`,
+          {
+            credentials: "include",
+          }
+        );
+      } else {
+        res = await fetch(
+          `https://api.github.com/search/repositories?q=${encodeURIComponent(
+            finalQuery
+          )}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
           { headers: getHeaders(userToken) }
         );
       }
-      
+
       if (!res.ok) {
         console.error(`GitHub API error: ${res.status} ${res.statusText}`);
-        
-        // If query is complex and fails, try a simpler fallback query
-        if (finalQuery.split(' ').length > 2) {
-          // Fallback to a very simple query
-          const simpleFallback = 'stars:>100';
+        if (finalQuery.split(" ").length > 2) {
+          const simpleFallback = "stars:>100";
           console.log("Trying simpler fallback query:", simpleFallback);
-          
-          // Retry with simpler query
-          if (typeof window !== 'undefined') {
-            res = await fetch(`/api/github/repos?q=${encodeURIComponent(simpleFallback)}&page=${page}`, {
-              credentials: 'include'
-            });
+          if (typeof window !== "undefined") {
+            res = await fetch(
+              `/api/github/repos?q=${encodeURIComponent(
+                simpleFallback
+              )}&page=${page}`,
+              {
+                credentials: "include",
+              }
+            );
           } else {
             res = await fetch(
-              `https://api.github.com/search/repositories?q=${encodeURIComponent(simpleFallback)}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
+              `https://api.github.com/search/repositories?q=${encodeURIComponent(
+                simpleFallback
+              )}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
               { headers: getHeaders(userToken) }
             );
           }
-          
           if (!res.ok) {
-            // If even the fallback fails, throw error
-            throw new Error(`Failed to fetch repositories with fallback query: ${res.status} ${res.statusText}`);
+            throw new Error(
+              `Failed to fetch repositories with fallback query: ${res.status} ${res.statusText}`
+            );
           }
         } else {
-          throw new Error(`Failed to fetch repositories: ${res.status} ${res.statusText}`);
+          throw new Error(
+            `Failed to fetch repositories: ${res.status} ${res.statusText}`
+          );
         }
       }
-      
-      // Parse the response
+
       const data = await res.json();
-      const items = typeof window !== 'undefined' ? data.repositories : data.items;
-      
+      const items =
+        typeof window !== "undefined" ? data.repositories : data.items;
+
       const filteredRepos = (items || []).filter(
         (repo: GitHubRepo) =>
           !BANNED_KEYWORDS.some(
@@ -529,22 +517,20 @@
               (repo.description?.toLowerCase() || "").includes(keyword)
           )
       );
-      
-      // Create cache structure for this page if needed
+
+      // CORRECTED: Initialize the nested object if it doesn't exist before assigning to it.
       if (!repoCache.popular[page]) {
         repoCache.popular[page] = {};
       }
-      
-      // Cache the results with the query-specific key
+
       repoCache.popular[page][cacheKey] = {
         data: filteredRepos,
         timestamp: Date.now(),
       };
-      
+
       return filteredRepos;
     } catch (error) {
       console.error("Error fetching repositories:", error);
-      // Return empty array as fallback
       return [];
     }
   }

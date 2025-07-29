@@ -56,72 +56,83 @@ import prisma from '@/prisma/prisma';
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
-    const page = parseInt(url.searchParams.get('page') || '1');
-    const limit = parseInt(url.searchParams.get('limit') || '10');
-    const language = url.searchParams.get('language') || 'all';
-    const topicFilter = url.searchParams.get('topic') || 'all';
-    const beginnerFriendly = url.searchParams.get('beginner') === 'true';
-    
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = parseInt(url.searchParams.get("limit") || "10");
+    const language = url.searchParams.get("language") || "all";
+    const topicFilter = url.searchParams.get("topic") || "all";
+    const beginnerFriendly = url.searchParams.get("beginner") === "true";
+
     // Get user session to personalize results and use their GitHub token
     const session = await auth();
-    // Extract GitHub token from session if available
-    const userToken = session?.user?.githubAccessToken;
-    
+    let userToken: string | null = null;
+
+    // CORRECTED: Securely fetch the access token from the database if the user is logged in
+    if (session?.user?.id) {
+      const account = await prisma.account.findFirst({
+        where: {
+          userId: session.user.id,
+          provider: "github",
+        },
+      });
+      userToken = account?.access_token || null;
+    }
+
     // Build filter based on query parameters
     const filter: any = {};
-    
-    if (language !== 'all') {
+
+    if (language !== "all") {
       filter.language = language;
     }
-    
-    if (topicFilter !== 'all') {
+
+    if (topicFilter !== "all") {
       filter.topics = [topicFilter];
     }
-    
+
     if (beginnerFriendly) {
-      filter.skillLevel = 'beginner';
+      filter.skillLevel = "beginner";
     }
-    
+
     // Fetch repositories from database
     const dbRepositories = await getRepositories(page, limit, filter);
-    
-    // Variable to hold new repositories we might fetch
+
     let newRepos: any[] = [];
     let rateLimited = false;
     let rateLimitMessage = "";
-    
-    // Check if we need to fetch more repositories from GitHub
-    // We might need to if:
-    // 1. We have fewer repositories than requested
-    // 2. We're on the first page (to ensure fresh data)
+
     if (dbRepositories.length < limit || page === 1) {
       try {
-        // Check for rate limiting
-        const hasQuota = await checkRateLimit();
-        
+        const hasQuota = await checkRateLimit(userToken);
+
         if (!hasQuota) {
           rateLimited = true;
-          rateLimitMessage = "GitHub API rate limit exceeded. Showing cached results.";
+          rateLimitMessage =
+            "GitHub API rate limit exceeded. Showing cached results.";
         } else {
-          // We have quota, fetch new repositories
           try {
-            // Get repositories from GitHub API (using user token if available)
-            const githubRepos = await fetchQualityRepos(page, userToken);
-            // Process repositories to our format (limit to 5 to avoid excessive API calls)
+            const githubRepos = await fetchQualityRepos(
+              page,
+              "",
+              beginnerFriendly,
+              // Corrected: Ensure null is converted to undefined
+              userToken || undefined
+            );
             newRepos = await processRepositoriesData(githubRepos.slice(0, 5), {
               maxRepos: 5,
-              userToken
+              // Corrected: Ensure null is converted to undefined
+              userToken: userToken || undefined,
             });
-            
-            // Store new repositories in database
+
             if (newRepos.length > 0) {
               await storeRepositories(newRepos);
             }
           } catch (error) {
-            // Handle rate limiting errors
-            if (error instanceof Error && error.message.includes("rate limit exceeded")) {
+            if (
+              error instanceof Error &&
+              error.message.includes("rate limit exceeded")
+            ) {
               rateLimited = true;
-              rateLimitMessage = "GitHub API rate limit exceeded. Showing cached results.";
+              rateLimitMessage =
+                "GitHub API rate limit exceeded. Showing cached results.";
             } else {
               console.error("Error fetching repositories from GitHub:", error);
             }
@@ -130,30 +141,41 @@ export async function GET(req: NextRequest) {
       } catch (error) {
         console.error("Error checking rate limit:", error);
         rateLimited = true;
-        rateLimitMessage = "Unable to check GitHub API rate limit. Showing cached results.";
+        rateLimitMessage =
+          "Unable to check GitHub API rate limit. Showing cached results.";
       }
     }
-    
-    // Combine database repositories with newly fetched ones
-    // Make sure we don't duplicate repositories
-    const existingRepoIds = new Set(dbRepositories.map(repo => repo.repoId));
-    const uniqueNewRepos = newRepos.filter(repo => !existingRepoIds.has(repo.id));
-    
-    // Construct combined repositories list
-    let allRepos = [...dbRepositories];
+
+    const existingRepoIds = new Set(dbRepositories.map((repo) => repo.repoId));
+    const uniqueNewRepos = newRepos.filter(
+      (repo) => !existingRepoIds.has(repo.id)
+    );
+
+    let allRepos: any[] = [...dbRepositories]; // Ensure allRepos is typed correctly
     if (uniqueNewRepos.length > 0) {
-      // Convert new repos to our database format for consistency
-      const formattedNewRepos = uniqueNewRepos.map(repo => ({
-        id: repo.id.toString(), // Convert to string for consistency
+      const formattedNewRepos = uniqueNewRepos.map((repo) => ({
+        id: repo.id.toString(),
         repoId: repo.id,
         name: repo.name,
-        owner: repo.owner,
+        owner: typeof repo.owner === "object" ? repo.owner.login : repo.owner,
         fullName: repo.fullName,
         description: repo.description,
         language: repo.language,
-        stars: parseInt(repo.stars.replace('k', '000').replace('M', '000000')),
-        forks: parseInt(repo.forks.replace('k', '000').replace('M', '000000')),
-        issues: parseInt(repo.issuesCount.replace('k', '000').replace('M', '000000')),
+        stars: parseInt(
+          repo.stars.replace(/[kM]/, (m: string) =>
+            m === "k" ? "000" : "000000"
+          )
+        ),
+        forks: parseInt(
+          repo.forks.replace(/[kM]/, (m: string) =>
+            m === "k" ? "000" : "000000"
+          )
+        ),
+        issues: parseInt(
+          repo.issuesCount.replace(/[kM]/, (m: string) =>
+            m === "k" ? "000" : "000000"
+          )
+        ),
         ownerAvatar: repo.ownerAvatar,
         topics: repo.topics,
         size: repo.size,
@@ -162,34 +184,27 @@ export async function GET(req: NextRequest) {
         license: repo.license,
         createdAt: new Date(repo.createdAt),
         updatedAt: new Date(repo.updatedAt),
-        lastFetchedAt: new Date()
+        lastFetchedAt: new Date(),
       }));
-      
+
       allRepos = [...allRepos, ...formattedNewRepos];
     }
-    
-    // Use DeepSeek to personalize repositories if user is logged in
+
     if (session?.user?.id) {
       try {
-        // Get user preferences
-        // Attempt to get preferences from the database
-        // For now we're using a hardcoded approach, this should be replaced with actual user preferences
-        // from a dedicated user_preferences table in the database
         const userPreferences = {
           interests: [] as string[],
-          skillLevel: beginnerFriendly ? 'beginner' : 'intermediate',
-          looking: beginnerFriendly ? ['Beginner Friendly'] : [],
-          preferredLanguages: language !== 'all' ? [language] : []
+          skillLevel: beginnerFriendly ? "beginner" : "intermediate",
+          looking: beginnerFriendly ? ["Beginner Friendly"] : [],
+          preferredLanguages: language !== "all" ? [language] : [],
         };
-        
-        if (topicFilter !== 'all') {
+
+        if (topicFilter !== "all") {
           userPreferences.interests.push(topicFilter);
         }
-        
-        // Get GitHub profile data
+
         const userProfile = await getGitHubUserProfile(session.user.id);
-        
-        // Personalize repositories with DeepSeek
+
         allRepos = await getPersonalizedRepositories(
           allRepos,
           userProfile,
@@ -198,15 +213,12 @@ export async function GET(req: NextRequest) {
         );
       } catch (error) {
         console.error("Error personalizing repositories:", error);
-        // Continue with unpersonalized repositories
       }
     }
-    
-    // Calculate hasMore
+
     const totalCount = await getRepositoriesCount(filter);
     const hasMore = totalCount > page * limit || uniqueNewRepos.length > 0;
-    
-    // Return repositories
+
     return NextResponse.json({
       repositories: allRepos.slice(0, limit),
       totalCount,
@@ -215,17 +227,16 @@ export async function GET(req: NextRequest) {
       hasMore,
       rateLimited,
       message: rateLimitMessage,
-      fromCache: uniqueNewRepos.length === 0
+      fromCache: uniqueNewRepos.length === 0,
     });
   } catch (error) {
-    console.error('Error fetching repositories:', error);
+    console.error("Error fetching repositories:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch repositories' },
+      { error: "Failed to fetch repositories" },
       { status: 500 }
     );
   }
 }
-
 export async function POST(req: NextRequest) {
   try {
     const { userId, repositoryId, notes } = await req.json();
