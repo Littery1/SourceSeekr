@@ -3,18 +3,10 @@
 
 generator client {
   provider        = "prisma-client-js"
-  // Keep your existing binaryTargets
   binaryTargets   = ["native", "windows", "debian-openssl-3.0.x", "rhel-openssl-1.0.x", "linux-musl-openssl-3.0.x"]
-  previewFeatures = ["driverAdapters"] // Add this line for modern bundler compatibility
+  previewFeatures = ["driverAdapters"] // Add this line
 }
 
-// Add this new generator for the Edge-compatible client
-generator edge {
-  provider        = "prisma-client-js"
-  output          = "./generated/edge" // Generate it into a separate folder
-  engineType      = "library"
-  previewFeatures = ["driverAdapters"] // Also add this line here
-}
 
 datasource db {
   provider = "postgresql"

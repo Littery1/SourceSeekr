@@ -57,20 +57,19 @@ export default function SavedPage() {
           throw new Error(`Failed to fetch saved repositories: ${res.status}`);
         }
 
-        const data = await res.json();
+               const data = await res.json();
 
-        // The API directly returns the array, so we use `data` itself.
-        const repos = Array.isArray(data) ? data : data.repositories || [];
+               // The API returns the array directly.
+               const savedRepoData = Array.isArray(data) ? data : [];
 
-        // Convert string dates to Date objects
-        setRepositories(
-          repos.map((item: any) => ({
-            ...item.repository, // The actual repository data is nested
-            id: item.id, // Use the SavedRepository ID
-            savedAt: new Date(item.createdAt),
-            notes: item.notes,
-          }))
-        );
+               // The repository data is nested inside each item
+               setRepositories(
+                 savedRepoData.map((item: any) => ({
+                   ...item.repository,
+                   savedAt: new Date(item.createdAt), // The save date is on the parent object
+                   notes: item.notes,
+                 }))
+               );
       } catch (error) {
         console.error("Error fetching saved repositories:", error);
       } finally {

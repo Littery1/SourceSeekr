@@ -3,8 +3,9 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-// Corrected: Import the default export from our edge client file
+// Correctly import the default export from our edge client file
 import prisma from "./prisma/edge";
+import type { PrismaClient } from "@prisma/client";
 
 // --- Environment Variable Validation ---
 const GITHUB_CLIENT_ID = process.env.AUTH_GITHUB_ID;
@@ -15,10 +16,9 @@ if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET || !AUTH_SECRET) {
   throw new Error("Missing environment variables for authentication");
 }
 
-// We no longer need to validate DATABASE_EDGE_URL here, as prisma/edge.ts handles it.
-
 export const { handlers, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  // Use a type assertion to satisfy the adapter's type requirement
+  adapter: PrismaAdapter(prisma as unknown as PrismaClient),
   secret: AUTH_SECRET,
   providers: [
     GitHub({
