@@ -1,8 +1,7 @@
-// auth.ts
-
-import NextAuth, { Profile } from "next-auth";
-import GitHub from "next-auth/providers/github";
-import prisma from "@/lib/prisma"; // Using our unified, serverless-safe client
+import NextAuth from "next-auth";
+import { authConfig } from "./auth.config"; // Import the base config
+import prisma from "./lib/prisma";
+import { Profile } from "next-auth";
 
 interface GitHubProfile extends Profile {
   login?: string;
@@ -10,21 +9,11 @@ interface GitHubProfile extends Profile {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  providers: [
-    GitHub({
-      clientId: process.env.AUTH_GITHUB_ID,
-      clientSecret: process.env.AUTH_GITHUB_SECRET,
-    }),
-  ],
-  session: {
-    strategy: "jwt",
-  },
-  secret: process.env.AUTH_SECRET,
-  trustHost: true,
-  pages: {
-    signIn: "/login",
-  },
+  ...authConfig, // Spread the base, Edge-safe config
   callbacks: {
+    ...authConfig.callbacks, // Include the authorized callback for completeness
+    // This is your original signIn callback that uses Prisma.
+    // It will only be used by the server-side API routes, not the middleware.
     async signIn({ user, account, profile }) {
       if (!account || !profile?.email) return false;
       try {
