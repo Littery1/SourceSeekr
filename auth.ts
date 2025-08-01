@@ -4,7 +4,6 @@ import NextAuth, { Profile } from "next-auth";
 import GitHub from "next-auth/providers/github";
 import prisma from "@/lib/prisma"; // Using our unified, serverless-safe client
 
-// We extend the default Profile type to include properties from the GitHub provider
 interface GitHubProfile extends Profile {
   login?: string;
   avatar_url?: string;
@@ -27,15 +26,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (!account || !profile?.email) {
-        return false;
-      }
-
+      if (!account || !profile?.email) return false;
       try {
         const githubProfile = profile as GitHubProfile;
-
-        // --- THIS IS THE FIX ---
-        // Ensure the image property is a string or null, not an empty object.
         const userImage =
           (typeof profile.image === "string"
             ? profile.image
@@ -45,13 +38,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           where: { email: profile.email },
           update: {
             name: profile.name ?? githubProfile.login ?? "GitHub User",
-            image: userImage, // Use the sanitized image URL
+            image: userImage,
           },
           create: {
             id: user.id,
             email: profile.email,
             name: profile.name ?? githubProfile.login ?? "GitHub User",
-            image: userImage, // Use the sanitized image URL
+            image: userImage,
           },
         });
 
@@ -80,23 +73,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             id_token: account.id_token,
           },
         });
-
         return true;
       } catch (error) {
         console.error("Auth.js signIn callback error:", error);
         return false;
       }
     },
-
     async jwt({ token, user, account }) {
-      if (user?.id) {
-        // Find the user in our DB to ensure the token ID matches our internal UUID
+      if (account && user) {
         const dbUser = await prisma.user.findFirst({
           where: {
             accounts: {
               some: {
-                provider: account?.provider,
-                providerAccountId: account?.providerAccountId,
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
               },
             },
           },
@@ -107,7 +97,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return token;
     },
-
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
