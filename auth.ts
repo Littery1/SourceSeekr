@@ -3,28 +3,14 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import prisma from "./prisma/client"; // <-- Use the serverless-safe client
-
-const GITHUB_CLIENT_ID = process.env.AUTH_GITHUB_ID;
-const GITHUB_CLIENT_SECRET = process.env.AUTH_GITHUB_SECRET;
-const AUTH_SECRET = process.env.AUTH_SECRET;
-
-if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
-  throw new Error(
-    "Missing GitHub OAuth credentials (AUTH_GITHUB_ID or AUTH_GITHUB_SECRET)"
-  );
-}
-
-if (!AUTH_SECRET) {
-  throw new Error("Missing AUTH_SECRET environment variable");
-}
+import prisma from "./prisma/client";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     GitHub({
-      clientId: GITHUB_CLIENT_ID,
-      clientSecret: GITHUB_CLIENT_SECRET,
+      clientId: process.env.AUTH_GITHUB_ID,
+      clientSecret: process.env.AUTH_GITHUB_SECRET,
       authorization: {
         params: {
           scope: "read:user user:email public_repo",
@@ -35,17 +21,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "database",
   },
-  callbacks: {
-    async session({ session, user }) {
-      if (session.user && user) {
-        session.user.id = user.id;
-      }
-      return session;
-    },
-  },
-  pages: {
-    signIn: "/login",
-  },
-  secret: AUTH_SECRET,
+  secret: process.env.AUTH_SECRET,
+  // trustHost is needed to allow Vercel's dynamic preview URLs.
   trustHost: true,
 });
