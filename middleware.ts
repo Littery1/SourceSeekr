@@ -1,20 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { auth } from "@/auth"; // Assuming auth is configured for JWT
 
-// 1. Specify protected and auth routes
 const protectedRoutes = ["/dashboard", "/profile", "/saved", "/chat"];
 const authRoutes = ["/login", "/register"];
 
-export function middleware(req: NextRequest) {
-  // 2. Check for a session cookie
-  // Vercel prefixes the cookie with __Secure- on production/preview environments
-  const sessionToken =
-    req.cookies.get("authjs.session-token")?.value ||
-    req.cookies.get("__Secure-authjs.session-token")?.value;
-  const isLoggedIn = !!sessionToken;
-
+export default auth((req) => {
   const { pathname } = req.nextUrl;
+  const isLoggedIn = !!req.auth;
 
-  // 3. Handle redirects
   const isProtectedRoute = protectedRoutes.some((path) =>
     pathname.startsWith(path)
   );
@@ -31,9 +24,10 @@ export function middleware(req: NextRequest) {
   }
 
   return NextResponse.next();
-}
+});
 
-// This config remains the same
+// This config prevents the middleware from running on static files and API routes
+// It's crucial to exclude the /api/auth routes from the middleware to prevent conflicts.
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|images).*)"],
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|images).*)"],
 };
