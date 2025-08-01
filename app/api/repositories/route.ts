@@ -52,7 +52,7 @@ async function getGitHubUserProfile(userId: string) {
 }
 
 // Import Prisma client for database operations
-import prisma from '@/prisma/prisma';
+import prisma from "@/prisma/client";
 
 export async function GET(req: NextRequest) {
   try {
