@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import * as githubAPI from "@/lib/github-api";
 import prisma from "@/prisma/prisma"; // Import the Prisma client
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**

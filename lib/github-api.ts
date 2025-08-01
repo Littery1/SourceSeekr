@@ -396,144 +396,68 @@
   /**
    * Fetch popular repositories based on stars, with optional query and filters
    */
-  export async function fetchQualityRepos(
-    page = 1,
-    query: string = "",
-    beginnerFriendly: boolean = false,
-    userToken?: string | null
-  ): Promise<GitHubRepo[]> {
-    // Create a cache key based on parameters
-    const cacheKey = `${query}_${beginnerFriendly ? "beginner" : "all"}`;
+   export async function fetchQualityRepos(
+     page = 1,
+     query: string = "",
+     beginnerFriendly: boolean = false,
+     userToken?: string | null
+   ): Promise<GitHubRepo[]> {
+     const cacheKey = `${query}_${beginnerFriendly ? "beginner" : "all"}`;
+     const cachedEntry = repoCache.popular[page]?.[cacheKey];
+     if (cachedEntry && isCacheValid(cachedEntry)) {
+       return cachedEntry.data;
+     }
 
-    // CORRECTED: Safely access the nested cache object
-    const cachedEntry = repoCache.popular[page]?.[cacheKey];
-    if (cachedEntry && isCacheValid(cachedEntry)) {
-      return cachedEntry.data;
-    }
+     if (!(await checkRateLimit(userToken))) {
+       throw new GitHubRateLimitError();
+     }
 
-    // Check rate limit first with user token
-    const hasQuota = await checkRateLimit(userToken);
-    if (!hasQuota) {
-      throw new Error("GitHub API rate limit exceeded");
-    }
+     let searchQuery = query.trim() || "stars:>100";
+     if (beginnerFriendly && !searchQuery.includes("good-first-issues")) {
+       searchQuery += " good-first-issues:>0";
+     }
 
-    // Build search query, starting with simpler default
-    let searchQuery = query.trim() || "stars:>50";
+     // This is the main fix: Always call the external GitHub API directly.
+     // Never fetch from our own '/api/github/repos' inside this file.
+     try {
+       apiCallStats.trackCall(`search/repositories:${searchQuery}`);
+       const res = await fetch(
+         `https://api.github.com/search/repositories?q=${encodeURIComponent(
+           searchQuery
+         )}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
+         { headers: getHeaders(userToken) }
+       );
 
-    let queryParts = [searchQuery];
+       if (!res.ok) {
+         throw new Error(
+           `Failed to fetch repositories: ${res.status} ${res.statusText}`
+         );
+       }
 
-    if (!searchQuery.includes("language:")) {
-      let language = "javascript";
-      try {
-        if (typeof window !== "undefined") {
-          const savedPreferences = localStorage.getItem(
-            "sourceseekr-preferences"
-          );
-          if (savedPreferences) {
-            const prefs = JSON.parse(savedPreferences);
-            if (prefs.preferredLanguages?.length > 0) {
-              language = prefs.preferredLanguages[0].toLowerCase();
-            }
-          }
-        }
-      } catch (e) {
-        console.error("Error parsing preferences:", e);
-      }
-      queryParts.push(`language:${language}`);
-    }
+       const data = await res.json();
+       const filteredRepos = (data.items || []).filter(
+         (repo: GitHubRepo) =>
+           !BANNED_KEYWORDS.some(
+             (keyword) =>
+               repo.name.toLowerCase().includes(keyword) ||
+               (repo.description?.toLowerCase() || "").includes(keyword)
+           )
+       );
 
-    if (beginnerFriendly && !searchQuery.includes("good-first-issues")) {
-      queryParts.push("good-first-issues:>0");
-    }
+       if (!repoCache.popular[page]) {
+         repoCache.popular[page] = {};
+       }
+       repoCache.popular[page][cacheKey] = {
+         data: filteredRepos,
+         timestamp: Date.now(),
+       };
 
-    let finalQuery = queryParts.join(" ").trim();
-    if (!finalQuery) {
-      finalQuery = "stars:>100";
-    }
-
-    console.log("GitHub search query:", finalQuery);
-
-    try {
-      let res;
-      if (typeof window !== "undefined") {
-        res = await fetch(
-          `/api/github/repos?q=${encodeURIComponent(finalQuery)}&page=${page}`,
-          {
-            credentials: "include",
-          }
-        );
-      } else {
-        res = await fetch(
-          `https://api.github.com/search/repositories?q=${encodeURIComponent(
-            finalQuery
-          )}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
-          { headers: getHeaders(userToken) }
-        );
-      }
-
-      if (!res.ok) {
-        console.error(`GitHub API error: ${res.status} ${res.statusText}`);
-        if (finalQuery.split(" ").length > 2) {
-          const simpleFallback = "stars:>100";
-          console.log("Trying simpler fallback query:", simpleFallback);
-          if (typeof window !== "undefined") {
-            res = await fetch(
-              `/api/github/repos?q=${encodeURIComponent(
-                simpleFallback
-              )}&page=${page}`,
-              {
-                credentials: "include",
-              }
-            );
-          } else {
-            res = await fetch(
-              `https://api.github.com/search/repositories?q=${encodeURIComponent(
-                simpleFallback
-              )}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
-              { headers: getHeaders(userToken) }
-            );
-          }
-          if (!res.ok) {
-            throw new Error(
-              `Failed to fetch repositories with fallback query: ${res.status} ${res.statusText}`
-            );
-          }
-        } else {
-          throw new Error(
-            `Failed to fetch repositories: ${res.status} ${res.statusText}`
-          );
-        }
-      }
-
-      const data = await res.json();
-      const items =
-        typeof window !== "undefined" ? data.repositories : data.items;
-
-      const filteredRepos = (items || []).filter(
-        (repo: GitHubRepo) =>
-          !BANNED_KEYWORDS.some(
-            (keyword) =>
-              repo.name.toLowerCase().includes(keyword) ||
-              (repo.description?.toLowerCase() || "").includes(keyword)
-          )
-      );
-
-      // CORRECTED: Initialize the nested object if it doesn't exist before assigning to it.
-      if (!repoCache.popular[page]) {
-        repoCache.popular[page] = {};
-      }
-
-      repoCache.popular[page][cacheKey] = {
-        data: filteredRepos,
-        timestamp: Date.now(),
-      };
-
-      return filteredRepos;
-    } catch (error) {
-      console.error("Error fetching repositories:", error);
-      return [];
-    }
-  }
+       return filteredRepos;
+     } catch (error) {
+       console.error("Error fetching quality repositories:", error);
+       return []; // Return empty on error instead of re-throwing
+     }
+   }
 
   /**
    * Fetch trending repositories (created in the last month)
@@ -844,35 +768,28 @@
   /**
    * Fetch pull request count
    */
-  export async function fetchRepoPullRequests(
-    owner: string,
-    repo: string,
-    userToken?: string | null
-  ): Promise<number> {
-    try {
-      const hasQuota = await checkRateLimit();
-      if (!hasQuota) return 0;
+    export async function fetchRepoPullRequests(
+      owner: string,
+      repo: string,
+      userToken?: string | null
+    ): Promise<number> {
+      try {
+        if (!(await checkRateLimit(userToken))) return 0;
 
-      // Safer approach - some repositories might be restricted or private
-      // Just return a default value instead of making a potentially error-prone call
-      return 0;
-      
-      // Original implementation has permission issues (403 errors)
-      /*
-      const res = await fetch(
-        `https://api.github.com/search/issues?q=repo:${owner}/${repo}+is:pr`,
-        { headers: getHeaders(userToken) }
-      );
-      
-      if (!res.ok) return 0;
-      const data = await res.json();
-      return data.total_count;
-      */
-    } catch (error) {
-      console.error("Error fetching pull requests:", error);
-      return 0;
-    }
-  }
+        apiCallStats.trackCall(`search/issues:pulls`);
+        const res = await fetch(
+          `https://api.github.com/search/issues?q=repo:${owner}/${repo}+is:pr+is:open`,
+          { headers: getHeaders(userToken) }
+        );
+
+        if (!res.ok) return 0;
+        const data = await res.json();
+        return data.total_count || 0;
+      } catch (error) {
+        console.error("Error fetching pull requests:", error);
+        return 0;
+      }
+    } 
 
   /**
    * Fetch repository readme
@@ -996,62 +913,62 @@
       }
       
            const query = `
-        query RepositoryData($owner: String!, $name: String!) {
-          repository(owner: $owner, name: $name) {
-            id
-            name
-            description
-            stargazerCount
-            forkCount
-            openIssues: issues(states: OPEN) {
-              totalCount
-              nodes(first: 5) {
-                title
-                number
-                url
-              }
-            }
-            pullRequests {
-              totalCount
-            }
-            primaryLanguage {
+    query RepositoryData($owner: String!, $name: String!) {
+      repository(owner: $owner, name: $name) {
+        id
+        name
+        description
+        stargazerCount
+        forkCount
+        openIssues: issues(states: OPEN, first: 5) { # Correct placement of 'first: 5'
+          totalCount
+          nodes {
+            title
+            number
+            url
+          }
+        }
+        pullRequests(states: OPEN) {
+          totalCount
+        }
+        primaryLanguage {
+          name
+        }
+        owner {
+          login
+          avatarUrl
+        }
+        collaborators(first: 10, affiliation: DIRECT) {
+          nodes {
+            login
+            avatarUrl
+          }
+        }
+        repositoryTopics(first: 20) {
+          nodes {
+            topic {
               name
-            }
-            owner {
-              login
-              avatarUrl
-            }
-            collaborators(first: 10, affiliation: DIRECT) {
-              nodes {
-                login
-                avatarUrl
-              }
-            }
-            repositoryTopics(first: 20) {
-              nodes {
-                topic {
-                  name
-                }
-              }
-            }
-            homepageUrl
-            createdAt
-            updatedAt
-            licenseInfo {
-              name
-            }
-            diskUsage
-            defaultBranchRef {
-              name
-            }
-            object(expression: "HEAD:README.md") {
-              ... on Blob {
-                text
-              }
             }
           }
         }
-      `;
+        homepageUrl
+        createdAt
+        updatedAt
+        licenseInfo {
+          name
+        }
+        diskUsage
+        defaultBranchRef {
+          name
+        }
+        object(expression: "HEAD:README.md") {
+          ... on Blob {
+            text
+          }
+        }
+      }
+    }
+  `;
       
       try {
         const response = await fetch("https://api.github.com/graphql", {
@@ -1109,170 +1026,115 @@
   /**
    * Process a GitHub repository into our application's format
    */
-  export async function processRepositoryData(
-    repo: GitHubRepo,
-    userToken?: string | null
-  ): Promise<ProcessedRepo> {
-    const [owner, repoName] = repo.full_name.split("/");
+   export async function processRepositoryData(
+     repo: GitHubRepo,
+     userToken?: string | null
+   ): Promise<ProcessedRepo> {
+     const [owner, repoName] = repo.full_name.split("/");
 
-    // Check rate limit first
-    const hasQuota = await checkRateLimit();
-    if (!hasQuota) {
-      throw new GitHubRateLimitError();
-    }
+     // Try to use GraphQL for efficiency (1 request for most data)
+     if (userToken || process.env.GITHUB_TOKEN) {
+       try {
+         const graphqlData = await fetchRepositoryDataWithGraphQL(
+           owner,
+           repoName,
+           userToken
+         );
 
-    // Set default values for additional data to avoid showing empty state if API calls fail
-    let contributors: Contributor[] = [];
-    let issues: { title: string; number: number; html_url: string }[] = [];
-    let pullRequests = 0;
-    let readme = "";
-    
-    // Try to use GraphQL for efficiency if token is available (1 request instead of 5)
-    if (userToken || process.env.GITHUB_TOKEN) {
-      try {
-        const graphqlData = await fetchRepositoryDataWithGraphQL(owner, repoName, userToken);
-        
-        if (graphqlData) {
-          // Transform GraphQL data to our application format
-          return {
-            id: repo.id,
-            name: graphqlData.name,
-            fullName: `${owner}/${repoName}`,
-            description: graphqlData.description || null,
-            stars: formatNumber(graphqlData.stargazerCount),
-            forks: formatNumber(graphqlData.forkCount),
-            pullRequests: formatNumber(graphqlData.pullRequests.totalCount),
-            issuesCount: formatNumber(graphqlData.openIssues.totalCount),
-            issues: graphqlData.openIssues.nodes.map(
-              (issue: any) => issue.title
-            ),
-            language: graphqlData.primaryLanguage?.name || null,
-            ownerAvatar: graphqlData.owner.avatarUrl,
-            owner: graphqlData.owner.login,
-            contributors: (graphqlData.collaborators?.nodes || []).map(
-              (user: any) => ({
-                login: user.login,
-                avatar_url: user.avatarUrl,
-                contributions: 1, // Placeholder contribution count
-              })
-            ),
-            topics: graphqlData.repositoryTopics.nodes.map(
-              (topic: any) => topic.topic.name
-            ),
-            homepage: graphqlData.homepageUrl || null,
-            createdAt: graphqlData.createdAt,
-            updatedAt: graphqlData.updatedAt,
-            license: graphqlData.licenseInfo?.name || null,
-            size: graphqlData.diskUsage || repo.size,
-            readme: graphqlData.object?.text || "",
-            defaultBranch: graphqlData.defaultBranchRef?.name || "main",
-          };
-        }
-      } catch (error) {
-        console.error(`GraphQL fetch failed for ${repo.full_name}, falling back to REST API:`, error);
-        // If GraphQL fails, continue with REST API approach
-      }
-    }
+         if (graphqlData) {
+           // GraphQL succeeded, now make one additional REST call for accurate contributor data
+           const contributors = await fetchContributors(
+             owner,
+             repoName,
+             10,
+             userToken
+           );
 
-    // Fallback to REST API with minimal data fetching
-    try {
-      // For rate limit protection, we'll fetch these in sequence rather than parallel
-      // This reduces the chance of hitting the rate limit all at once
+           // Transform GraphQL data to our application format
+           return {
+             id: repo.id,
+             name: graphqlData.name,
+             fullName: `${owner}/${repoName}`,
+             description: graphqlData.description || null,
+             stars: formatNumber(graphqlData.stargazerCount),
+             forks: formatNumber(graphqlData.forkCount),
+             pullRequests: formatNumber(graphqlData.pullRequests.totalCount),
+             issuesCount: formatNumber(graphqlData.openIssues.totalCount),
+             issues: graphqlData.openIssues.nodes.map((issue: any) => ({
+               title: issue.title,
+               number: issue.number,
+               html_url: issue.url,
+             })),
+             language: graphqlData.primaryLanguage?.name || null,
+             ownerAvatar: graphqlData.owner.avatarUrl,
+             owner: graphqlData.owner.login,
+             contributors: contributors, // Use real contributor data
+             topics: graphqlData.repositoryTopics.nodes.map(
+               (topic: any) => topic.topic.name
+             ),
+             homepage: graphqlData.homepageUrl || null,
+             createdAt: graphqlData.createdAt,
+             updatedAt: graphqlData.updatedAt,
+             license: graphqlData.licenseInfo?.name || null,
+             size: graphqlData.diskUsage || repo.size,
+             readme: graphqlData.object?.text || "",
+             defaultBranch: graphqlData.defaultBranchRef?.name || "main",
+           };
+         }
+       } catch (error) {
+         console.error(
+           `GraphQL fetch failed for ${repo.full_name}, falling back to REST API:`,
+           error
+         );
+       }
+     }
 
-      // Only fetch contributors for repos with significant stars to reduce API calls
-      if (repo.stargazers_count > 100) {
-        try {
-          contributors = await fetchContributors(owner, repoName, 10, userToken);
-        } catch (error) {
-          if (
-            error instanceof GitHubRateLimitError ||
-            (error instanceof Error &&
-              error.message.includes("rate limit exceeded"))
-          ) {
-            throw error; // Re-throw rate limit errors to stop further processing
-          }
-          console.error(
-            `Error fetching contributors for ${repo.full_name}:`,
-            error
-          );
-        }
-      }
-      // When initializing at the beginning of the function:
-      let issues: { title: string; number: number; html_url: string }[] = [];
+     // Fallback to REST API if GraphQL fails or no token is available
+     let contributors: Contributor[] = [];
+     let issues: { title: string; number: number; html_url: string }[] = [];
+     let pullRequests = 0;
 
-      // In the REST API section where you handle issues:
-      if (repo.open_issues_count > 0) {
-        try {
-          issues = await fetchRepoIssues(owner, repoName, 5, userToken);
-        } catch (error) {
-          if (
-            error instanceof GitHubRateLimitError ||
-            (error instanceof Error &&
-              error.message.includes("rate limit exceeded"))
-          ) {
-            throw error; // Re-throw rate limit errors to stop further processing
-          }
-          console.error(`Error fetching issues for ${repo.full_name}:`, error);
-        }
-      }
+     try {
+       if (repo.stargazers_count > 50) {
+         // Fetch for moderately popular repos
+         [contributors, issues, pullRequests] = await Promise.all([
+           fetchContributors(owner, repoName, 10, userToken),
+           fetchRepoIssues(owner, repoName, 5, userToken),
+           fetchRepoPullRequests(owner, repoName, userToken),
+         ]);
+       }
+     } catch (error) {
+       console.error(`Error processing details for ${repo.full_name}:`, error);
+       if (error instanceof GitHubRateLimitError) throw error;
+     }
 
-      // Only fetch PRs for popular repos
-      if (repo.stargazers_count > 500) {
-        try {
-          pullRequests = await fetchRepoPullRequests(owner, repoName, userToken);
-        } catch (error) {
-          if (
-            error instanceof GitHubRateLimitError ||
-            (error instanceof Error &&
-              error.message.includes("rate limit exceeded"))
-          ) {
-            throw error; // Re-throw rate limit errors to stop further processing
-          }
-          console.error(
-            `Error fetching pull requests for ${repo.full_name}:`,
-            error
-          );
-        }
-      }
-
-      // Skip readme fetching entirely unless it's absolutely needed
-      // This is typically the heaviest API call and consumes the most resources
-      // Most UIs don't show the full readme immediately anyway
-    } catch (error) {
-      console.error(`Error processing details for ${repo.full_name}:`, error);
-      // If it's a rate limit error, re-throw so it can be handled upstream
-      if (error instanceof GitHubRateLimitError || 
-          (error instanceof Error && error.message.includes("rate limit exceeded"))) {
-        throw error;
-      }
-    }
-
-    // Format the data for our application
-    return {
-      id: repo.id,
-      name: repo.name,
-      fullName: repo.full_name,
-      description: repo.description || null,
-      stars: formatNumber(repo.stargazers_count),
-      forks: formatNumber(repo.forks_count),
-      pullRequests: formatNumber(pullRequests),
-      issuesCount: formatNumber(repo.open_issues_count),
-      issues,
-      language: repo.language,
-      ownerAvatar: repo.owner.avatar_url,
-      owner: repo.owner.login,
-      contributors: contributors.sort((a, b) => b.contributions - a.contributions),
-      topics: repo.topics || [],
-      homepage: repo.homepage || null,
-      createdAt: repo.created_at,
-      updatedAt: repo.updated_at,
-      license: repo.license?.name || null,
-      size: repo.size,
-      readme,
-      defaultBranch: repo.default_branch,
-    };
-  }
-
+     // Format the data for our application
+     return {
+       id: repo.id,
+       name: repo.name,
+       fullName: repo.full_name,
+       description: repo.description || null,
+       stars: formatNumber(repo.stargazers_count),
+       forks: formatNumber(repo.forks_count),
+       pullRequests: formatNumber(pullRequests),
+       issuesCount: formatNumber(repo.open_issues_count),
+       issues,
+       language: repo.language,
+       ownerAvatar: repo.owner.avatar_url,
+       owner: repo.owner.login,
+       contributors: contributors.sort(
+         (a, b) => b.contributions - a.contributions
+       ),
+       topics: repo.topics || [],
+       homepage: repo.homepage || null,
+       createdAt: repo.created_at,
+       updatedAt: repo.updated_at,
+       license: repo.license?.name || null,
+       size: repo.size,
+       readme: "", // Readme is deferred
+       defaultBranch: repo.default_branch,
+     };
+   }
   /**
    * Format large numbers for display
    */

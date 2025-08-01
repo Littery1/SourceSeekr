@@ -291,7 +291,7 @@ export default function RepositoryPage({
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { owner, name } = params;
-  
+
   // Add session to get the user's GitHub token
   const { data: session } = useSession();
 
@@ -373,14 +373,22 @@ export default function RepositoryPage({
   }, [activeTab]);
   // Effect 1: Update graph data when time range changes
   useEffect(() => {
-    // Only update data when time range changes
-    setStarsData(generateMockGraphData(selectedTimeRange.days, "growing"));
-    setIssuesData(generateMockGraphData(selectedTimeRange.days, "stable"));
-    setPullsData(generateMockGraphData(selectedTimeRange.days, "stable"));
-    setContributionsData(
-      generateMockGraphData(selectedTimeRange.days, "growing")
-    );
-  }, [selectedTimeRange]); // Only depend on selectedTimeRange
+    if (!repository) return;
+
+    let days = selectedTimeRange.days;
+    // If "All Time" is selected, calculate days since repo creation
+    if (days === 0 && repository.createdAt) {
+      const createdAt = new Date(repository.createdAt);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - createdAt.getTime());
+      days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    setStarsData(generateMockGraphData(days, "growing"));
+    setIssuesData(generateMockGraphData(days, "stable"));
+    setPullsData(generateMockGraphData(days, "stable"));
+    setContributionsData(generateMockGraphData(days, "growing"));
+  }, [selectedTimeRange, repository]); // Add repository to dependencies
   // Effect 2: Draw graph when data or active tab changes
   useEffect(() => {
     if (canvasRef.current && !loading && starsData.length > 0) {
@@ -570,72 +578,75 @@ export default function RepositoryPage({
     ctx.fillText(config.title, canvas.width / 2, padding.top / 2);
   };
 
-useEffect(() => {
-  const fetchRepositoryData = async () => {
-    try {
-      setLoading(true);
-      
-      // Use the server-side API endpoint to avoid CORS issues
-      const response = await fetch(`/api/github/repos?type=repository&owner=${owner}&name=${name}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch repository: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.success || !data.data) {
-        throw new Error(data.error || "Repository not found");
-      }
-      
-      const repoData = data.data;
-      
-      if (!repoData) {
-        throw new Error("Repository not found");
-      }
+  useEffect(() => {
+    const fetchRepositoryData = async () => {
+      try {
+        setLoading(true);
 
-      setRepository(repoData);
-
-      // Update the date-based data displayed in the UI
-      // This helps to generate meaningful graph data based on actual repo creation date
-      if (repoData.createdAt) {
-        const repoCreationDate = new Date(repoData.createdAt);
-        const now = new Date();
-        const diffDays = Math.floor(
-          (now.getTime() - repoCreationDate.getTime()) / (1000 * 60 * 60 * 24)
+        // Use the server-side API endpoint to avoid CORS issues
+        const response = await fetch(
+          `/api/github/repos?type=repository&owner=${owner}&name=${name}`
         );
 
-        // If the repository is older than the current selected time range,
-        // adjust the time range to something meaningful for this repo
-        if (diffDays < selectedTimeRange.days) {
-          // Find the closest time range that's appropriate for this repo's age
-          const appropriateTimeRange =
-            timeRanges.find((range) => range.days <= diffDays) || timeRanges[0];
-          setSelectedTimeRange(appropriateTimeRange);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch repository: ${response.status}`);
         }
-      }
-    } catch (err) {
-      console.error("Error fetching repository:", err);
 
-      // Check for authentication errors
-      if (
-        err instanceof Error &&
-        (err.message.includes("NetworkError") ||
-          err.message.includes("AuthError") ||
-          err.message.includes("fetch"))
-      ) {
-        setAuthError("Authentication error. Please try refreshing the page.");
-      } else {
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch repository"
-        );
+        const data = await response.json();
+
+        if (!data.success || !data.data) {
+          throw new Error(data.error || "Repository not found");
+        }
+
+        const repoData = data.data;
+
+        if (!repoData) {
+          throw new Error("Repository not found");
+        }
+
+        setRepository(repoData);
+
+        // Update the date-based data displayed in the UI
+        // This helps to generate meaningful graph data based on actual repo creation date
+        if (repoData.createdAt) {
+          const repoCreationDate = new Date(repoData.createdAt);
+          const now = new Date();
+          const diffDays = Math.floor(
+            (now.getTime() - repoCreationDate.getTime()) / (1000 * 60 * 60 * 24)
+          );
+
+          // If the repository is older than the current selected time range,
+          // adjust the time range to something meaningful for this repo
+          if (diffDays < selectedTimeRange.days) {
+            // Find the closest time range that's appropriate for this repo's age
+            const appropriateTimeRange =
+              timeRanges.find((range) => range.days <= diffDays) ||
+              timeRanges[0];
+            setSelectedTimeRange(appropriateTimeRange);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching repository:", err);
+
+        // Check for authentication errors
+        if (
+          err instanceof Error &&
+          (err.message.includes("NetworkError") ||
+            err.message.includes("AuthError") ||
+            err.message.includes("fetch"))
+        ) {
+          setAuthError("Authentication error. Please try refreshing the page.");
+        } else {
+          setError(
+            err instanceof Error ? err.message : "Failed to fetch repository"
+          );
+        }
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-  fetchRepositoryData();
-}, [owner, name, selectedTimeRange, session]);
+    };
+    fetchRepositoryData();
+  }, [owner, name, selectedTimeRange, session]);
 
   const toggleSaved = async () => {
     // Check if the user is authenticated
@@ -644,41 +655,56 @@ useEffect(() => {
       router.push("/login");
       return;
     }
-    
+
     try {
       setIsSaved(!isSaved);
-      
+
       if (!repository) return;
-      
+
       if (!isSaved) {
         // Save the repository
-        const response = await fetch('/api/repositories/saved', {
-          method: 'POST',
+        const response = await fetch("/api/repositories/saved", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('sourceseekr-token')}`
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem(
+              "sourceseekr-token"
+            )}`,
           },
           body: JSON.stringify({
             repoId: repository.id,
             name: repository.name,
-            owner: typeof repository.owner === 'object' ? repository.owner.login : repository.owner,
+            owner:
+              typeof repository.owner === "object"
+                ? repository.owner.login
+                : repository.owner,
             fullName: repository.fullName,
             description: repository.description,
             language: repository.language,
-            stars: parseInt(repository.stars.replace('k', '000').replace('M', '000000')),
-            forks: parseInt(repository.forks.replace('k', '000').replace('M', '000000')),
-            issues: parseInt(repository.issuesCount.replace('k', '000').replace('M', '000000')),
+            stars: parseInt(
+              repository.stars.replace("k", "000").replace("M", "000000")
+            ),
+            forks: parseInt(
+              repository.forks.replace("k", "000").replace("M", "000000")
+            ),
+            issues: parseInt(
+              repository.issuesCount.replace("k", "000").replace("M", "000000")
+            ),
             ownerAvatar: repository.ownerAvatar,
             topics: repository.topics,
             size: repository.size,
-            url: `https://github.com/${typeof repository.owner === 'object' ? repository.owner.login : repository.owner}/${repository.name}`,
+            url: `https://github.com/${
+              typeof repository.owner === "object"
+                ? repository.owner.login
+                : repository.owner
+            }/${repository.name}`,
             homepage: repository.homepage,
             license: repository.license,
             updatedAt: repository.updatedAt,
-            createdAt: repository.createdAt
+            createdAt: repository.createdAt,
           }),
         });
-        
+
         if (response.ok) {
           toast.success("Repository saved successfully");
         } else {
@@ -689,13 +715,18 @@ useEffect(() => {
         }
       } else {
         // Remove from saved
-        const response = await fetch(`/api/repositories/saved?fullName=${repository.fullName}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('sourceseekr-token')}`
+        const response = await fetch(
+          `/api/repositories/saved?fullName=${repository.fullName}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem(
+                "sourceseekr-token"
+              )}`,
+            },
           }
-        });
-        
+        );
+
         if (response.ok) {
           toast.success("Repository removed from saved items");
         } else {

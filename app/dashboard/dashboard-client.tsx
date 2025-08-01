@@ -380,6 +380,7 @@ export default function DashboardClient({ session }: { session: Session }) {
                     width={48}
                     height={48}
                     className="rounded-lg border border-border"
+                    priority
                   />
                   <div>
                     <h2 className="text-xl font-bold flex flex-wrap items-center gap-2 mb-1">
