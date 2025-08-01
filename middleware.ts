@@ -6,6 +6,7 @@ const authRoutes = ["/login", "/register"];
 
 export function middleware(req: NextRequest) {
   // 2. Check for a session cookie
+  // Vercel prefixes the cookie with __Secure- on production/preview environments
   const sessionToken =
     req.cookies.get("authjs.session-token")?.value ||
     req.cookies.get("__Secure-authjs.session-token")?.value;
