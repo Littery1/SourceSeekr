@@ -1,37 +1,38 @@
-import { auth } from "./auth";
-import { NextResponse } from 'next/server';
+import { auth } from "./auth.edge";
+import { NextResponse } from "next/server";
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const { nextUrl } = req;
 
-  // Define routes that require authentication
-  const protectedRoutes = ['/dashboard', '/profile', '/saved', '/chat'];
+  const isProtectedRoute = ["/dashboard", "/profile", "/saved", "/chat"].some(
+    (path) => nextUrl.pathname.startsWith(path)
+  );
 
-  const isProtectedRoute = protectedRoutes.some(path => nextUrl.pathname.startsWith(path));
+  const isAuthRoute = [
+    "/login",
+    "/register", // Add any other auth routes here
+  ].some((path) => nextUrl.pathname.startsWith(path));
 
+  // Case 1: Trying to access a protected route without being logged in
   if (isProtectedRoute && !isLoggedIn) {
-    // Redirect unauthenticated users to the login page
-    // Preserve the original URL they tried to access as a callbackUrl
+    // Redirect to login, preserving the intended destination
     const loginUrl = new URL("/login", nextUrl.origin);
-    loginUrl.searchParams.set("callbackUrl", nextUrl.pathname);
+    loginUrl.searchParams.set("callbackUrl", nextUrl.href); // Use full href
     return NextResponse.redirect(loginUrl);
   }
 
+  // Case 2: Already logged in, but trying to access an auth page (like /login)
+  if (isAuthRoute && isLoggedIn) {
+    // Redirect to the dashboard
+    return NextResponse.redirect(new URL("/dashboard", nextUrl.origin));
+  }
+
+  // Case 3: All other cases, allow the request to proceed
   return NextResponse.next();
 });
 
-// This config ensures the middleware runs on all paths except for static assets and API routes.
+// This config remains the same
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images (public image files)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico|images).*)',
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|images).*)"],
 };

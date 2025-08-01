@@ -164,8 +164,13 @@ const PopularRepositoriesCarousel = () => {
             <div className="bg-card rounded-xl border border-border shadow-lg p-6 h-full">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
+                  
                   <Image
-                    src={currentRepo.ownerAvatar}
+                    src={
+                      currentRepo.ownerAvatar
+                        ? currentRepo.ownerAvatar
+                        : "/images/github.svg"
+                    }
                     width={56}
                     height={56}
                     alt={`${getOwnerLogin(currentRepo.owner)} avatar`}

@@ -387,10 +387,16 @@ export default function ExplorePage() {
         
         if (!res.ok) return;
         
-        const data = await res.json();
-        // Extract repo IDs from saved repositories
-        const ids = data.repositories.map((repo: any) => repo.repoId);
-        setSavedRepoIds(ids);
+              const data = await res.json();
+              // The API directly returns the array of SavedRepository objects
+              const repos = Array.isArray(data)
+                ? data
+                : data.repositories || [];
+              // Extract repo IDs from the nested repository object
+              const ids = repos.map(
+                (savedRepo: any) => savedRepo.repository.repoId
+              );
+              setSavedRepoIds(ids);
       } catch (error) {
         console.error("Error fetching saved repository IDs:", error);
       }

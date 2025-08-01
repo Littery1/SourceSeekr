@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       }
     });
     
-    return NextResponse.json(savedRepos);
+    return NextResponse.json({ repositories: savedRepos });
   } catch (error) {
     console.error('Error fetching saved repositories:', error);
     return NextResponse.json(

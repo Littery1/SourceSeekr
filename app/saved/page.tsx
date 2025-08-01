@@ -49,23 +49,28 @@ export default function SavedPage() {
       
       try {
         setLoading(true);
-        const res = await fetch('/api/repositories/saved', {
-          credentials: 'include'
+        const res = await fetch("/api/repositories/saved", {
+          credentials: "include",
         });
-        
+
         if (!res.ok) {
           throw new Error(`Failed to fetch saved repositories: ${res.status}`);
         }
-        
+
         const data = await res.json();
-        
+
+        // The API directly returns the array, so we use `data` itself.
+        const repos = Array.isArray(data) ? data : data.repositories || [];
+
         // Convert string dates to Date objects
-        setRepositories(data.repositories.map((repo: any) => ({
-          ...repo,
-          updatedAt: new Date(repo.updatedAt),
-          createdAt: new Date(repo.createdAt),
-          savedAt: new Date(repo.savedAt)
-        })));
+        setRepositories(
+          repos.map((item: any) => ({
+            ...item.repository, // The actual repository data is nested
+            id: item.id, // Use the SavedRepository ID
+            savedAt: new Date(item.createdAt),
+            notes: item.notes,
+          }))
+        );
       } catch (error) {
         console.error("Error fetching saved repositories:", error);
       } finally {
