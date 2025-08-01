@@ -1,12 +1,21 @@
 // @/app/api/repositories/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { fetchQualityRepos, processRepositoriesData, checkRateLimit } from '@/lib/github-api';
-import { getRepositories, storeRepositories, getRepositoriesCount, isRepositoryStale } from '@/lib/repository-service';
-import { auth } from '@/auth';
-import { getPersonalizedRepositories } from '@/lib/deepseek-service';
+import { NextRequest, NextResponse } from "next/server";
+import {
+  fetchQualityRepos,
+  processRepositoriesData,
+  checkRateLimit,
+} from "@/lib/github-api";
+import {
+  getRepositories,
+  storeRepositories,
+  getRepositoriesCount,
+  isRepositoryStale,
+} from "@/lib/repository-service";
+import { auth } from "@/auth";
+import { getPersonalizedRepositories } from "@/lib/deepseek-service";
 
 export const dynamic = "force-dynamic";
-export const runtime = 'nodejs'; // 'edge' is not supported by Prisma
+export const runtime = "nodejs"; // 'edge' is not supported by Prisma
 
 // Mock function for getting GitHub user profile data
 // In a real implementation, this would fetch data from GitHub API
@@ -16,8 +25,8 @@ async function getGitHubUserProfile(userId: string) {
     const account = await prisma.account.findFirst({
       where: {
         userId,
-        provider: 'github'
-      }
+        provider: "github",
+      },
     });
 
     if (!account) {
@@ -27,32 +36,37 @@ async function getGitHubUserProfile(userId: string) {
     // This is just placeholder data
     // In a real implementation, we would use account.access_token to fetch actual data
     return {
-      username: 'user123',
-      name: 'User Name',
-      bio: 'I am a developer',
+      username: "user123",
+      name: "User Name",
+      bio: "I am a developer",
       followers: 10,
       following: 20,
       popularRepos: [
-        { name: 'project1', language: 'JavaScript', stars: 10, description: 'A sample project' }
+        {
+          name: "project1",
+          language: "JavaScript",
+          stars: 10,
+          description: "A sample project",
+        },
       ],
       languages: [
-        { language: 'JavaScript', percentage: 60 },
-        { language: 'TypeScript', percentage: 30 },
-        { language: 'Python', percentage: 10 }
+        { language: "JavaScript", percentage: 60 },
+        { language: "TypeScript", percentage: 30 },
+        { language: "Python", percentage: 10 },
       ],
       contributions: [
-        { language: 'JavaScript', count: 100 },
-        { language: 'TypeScript', count: 50 }
-      ]
+        { language: "JavaScript", count: 100 },
+        { language: "TypeScript", count: 50 },
+      ],
     };
   } catch (error) {
-    console.error('Error fetching GitHub user profile:', error);
+    console.error("Error fetching GitHub user profile:", error);
     return null;
   }
 }
 
 // Import Prisma client for database operations
-import prisma from "@/prisma/client";
+import prisma from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   try {
@@ -241,39 +255,36 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const { userId, repositoryId, notes } = await req.json();
-    
+
     // Validate input
     if (!userId || !repositoryId) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: "Missing required fields" },
         { status: 400 }
       );
     }
-    
+
     // Get user session for authorization
     const session = await auth();
-    
+
     if (!session?.user || session.user.id !== userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
+
     // Import the saveRepository function
-    const { saveRepository } = await import('@/lib/repository-service');
-    
+    const { saveRepository } = await import("@/lib/repository-service");
+
     // Save the repository for the user
     await saveRepository(userId, repositoryId, notes);
-    
+
     return NextResponse.json({
       success: true,
-      message: 'Repository saved successfully'
+      message: "Repository saved successfully",
     });
   } catch (error) {
-    console.error('Error saving repository:', error);
+    console.error("Error saving repository:", error);
     return NextResponse.json(
-      { error: 'Failed to save repository' },
+      { error: "Failed to save repository" },
       { status: 500 }
     );
   }

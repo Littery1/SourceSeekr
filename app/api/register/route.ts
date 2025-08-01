@@ -1,6 +1,6 @@
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
-import prisma from "@/prisma/client";
+import prisma from "@/lib/prisma";
 import { createUserSchema } from "@/lib/user-schema";
 import { ZodError } from "zod";
 

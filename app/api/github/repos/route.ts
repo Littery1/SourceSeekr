@@ -5,7 +5,7 @@ console.log(
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import * as githubAPI from "@/lib/github-api";
-import prisma from "@/prisma/client"; // Import the Prisma client
+import prisma from "@/lib/prisma"; // Import the Prisma client
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
