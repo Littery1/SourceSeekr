@@ -66,14 +66,7 @@ async function getGitHubUserProfile(userId: string) {
 }
 
 // Import Prisma client for database operations
-// --- Direct Prisma/Neon Initialization for this API Route ---
-import { PrismaClient } from "@prisma/client";
-import { PrismaNeon } from "@prisma/adapter-neon";
-import { Pool } from "@neondatabase/serverless";
-const neon = new Pool({ connectionString: process.env.DATABASE_URL! });
-const adapter = new PrismaNeon(neon);
-const prisma = new PrismaClient({ adapter });
-// --- End Initialization ---
+import prisma from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   try {

@@ -7,19 +7,15 @@ generator client {
   previewFeatures = ["driverAdapters"] // Add this line
 }
 
-
-// prisma/schema.prisma
-
 // prisma/schema.prisma
 
 datasource db {
   provider  = "postgresql"
-  // This POOLED URL is for your running application (runtime)
-  url       = env("DATABASE_URL")
-  // This DIRECT URL is for Prisma Migrate during the build
+  // For the live app, use the official Vercel pooled URL
+  url       = env("POSTGRES_PRISMA_URL")
+  // For migrations during build, use the official Vercel direct URL
   directUrl = env("POSTGRES_URL_NON_POOLING")
 }
-
 model User {
   id                String            @id @default(uuid())
   name              String
