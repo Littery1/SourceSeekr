@@ -10,12 +10,14 @@ generator client {
 
 // prisma/schema.prisma
 
+// prisma/schema.prisma
+
 datasource db {
-  provider = "postgresql"
-  // This tells Prisma to use the DATABASE_URL for everything, which is our pooled URL.
-  // The ?pgbouncer=true flag is automatically handled by Prisma's Data Proxy or Neon's driver adapter
-  // for migrations, making a second URL unnecessary with this setup.
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // This POOLED URL is for your running application (runtime)
+  url       = env("DATABASE_URL")
+  // This DIRECT URL is for Prisma Migrate during the build
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
 model User {

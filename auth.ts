@@ -3,7 +3,7 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import prisma from "./prisma/client";
+import prisma from "./prisma/client"; // Ensure this points to the unified client
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -11,17 +11,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     GitHub({
       clientId: process.env.AUTH_GITHUB_ID,
       clientSecret: process.env.AUTH_GITHUB_SECRET,
-      authorization: {
-        params: {
-          scope: "read:user user:email public_repo",
-        },
-      },
     }),
   ],
   session: {
     strategy: "database",
   },
   secret: process.env.AUTH_SECRET,
-  // trustHost is needed to allow Vercel's dynamic preview URLs.
   trustHost: true,
+  pages: {
+    signIn: "/login",
+  },
+  callbacks: {
+    async session({ session, user }) {
+      if (session.user && user) {
+        session.user.id = user.id;
+      }
+      return session;
+    },
+  },
 });
