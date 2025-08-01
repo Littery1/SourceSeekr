@@ -1,36 +1,36 @@
-import { auth } from "./auth.edge";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const { nextUrl } = req;
+// 1. Specify protected and auth routes
+const protectedRoutes = ["/dashboard", "/profile", "/saved", "/chat"];
+const authRoutes = ["/login", "/register"];
 
-  const isProtectedRoute = ["/dashboard", "/profile", "/saved", "/chat"].some(
-    (path) => nextUrl.pathname.startsWith(path)
+export function middleware(req: NextRequest) {
+  // 2. Check for a session cookie
+  const sessionToken =
+    req.cookies.get("authjs.session-token")?.value ||
+    req.cookies.get("__Secure-authjs.session-token")?.value;
+  const isLoggedIn = !!sessionToken;
+
+  const { pathname } = req.nextUrl;
+
+  // 3. Handle redirects
+  const isProtectedRoute = protectedRoutes.some((path) =>
+    pathname.startsWith(path)
   );
+  const isAuthRoute = authRoutes.some((path) => pathname.startsWith(path));
 
-  const isAuthRoute = [
-    "/login",
-    "/register", // Add any other auth routes here
-  ].some((path) => nextUrl.pathname.startsWith(path));
-
-  // Case 1: Trying to access a protected route without being logged in
   if (isProtectedRoute && !isLoggedIn) {
-    // Redirect to login, preserving the intended destination
-    const loginUrl = new URL("/login", nextUrl.origin);
-    loginUrl.searchParams.set("callbackUrl", nextUrl.href); // Use full href
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("callbackUrl", req.nextUrl.href);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Case 2: Already logged in, but trying to access an auth page (like /login)
   if (isAuthRoute && isLoggedIn) {
-    // Redirect to the dashboard
-    return NextResponse.redirect(new URL("/dashboard", nextUrl.origin));
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  // Case 3: All other cases, allow the request to proceed
   return NextResponse.next();
-});
+}
 
 // This config remains the same
 export const config = {
