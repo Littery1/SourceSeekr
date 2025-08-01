@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import * as githubAPI from "@/lib/github-api";
-import prisma from "@/lib/prisma";
+// --- Direct Prisma/Neon Initialization for this API Route ---
+import { PrismaClient } from "@prisma/client";
+import { PrismaNeon } from "@prisma/adapter-neon";
+import { Pool } from "@neondatabase/serverless";
+const neon = new Pool({ connectionString: process.env.DATABASE_URL! });
+const adapter = new PrismaNeon(neon);
+const prisma = new PrismaClient({ adapter });
+// --- End Initialization ---
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
