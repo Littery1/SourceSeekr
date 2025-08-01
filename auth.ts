@@ -19,13 +19,14 @@ if (!AUTH_SECRET) {
   throw new Error("Missing AUTH_SECRET environment variable");
 }
 
+// We no longer need to check for AUTH_URL here, as NextAuth defaults well.
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     GitHub({
       clientId: GITHUB_CLIENT_ID,
       clientSecret: GITHUB_CLIENT_SECRET,
-      // We removed the invalid "allowUnsafeEmailLinking" line from here.
       authorization: {
         params: {
           scope: "read:user user:email public_repo",
@@ -57,4 +58,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   secret: AUTH_SECRET,
+  // By explicitly setting trustHost, we avoid reliance on Vercel's build-time variables.
+  // NEXTAUTH_URL will be used instead, which you have correctly set in Vercel's dashboard.
+  trustHost: true,
 });
