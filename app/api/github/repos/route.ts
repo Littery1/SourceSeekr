@@ -1,3 +1,7 @@
+console.log(
+  "SERVER_STARTUP: GITHUB_TOKEN is:",
+  process.env.GITHUB_TOKEN ? "Loaded" : "MISSING"
+);
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import * as githubAPI from "@/lib/github-api";
@@ -5,6 +9,34 @@ import prisma from "@/prisma/prisma"; // Import the Prisma client
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// app/api/github/repos/route.ts
+
+async function getToken() {
+  const session = await auth();
+  if (session?.user?.id) {
+    const account = await prisma.account.findFirst({
+      where: {
+        userId: session.user.id,
+        provider: "github",
+      },
+    });
+    if (account?.access_token) {
+      console.log("✅ Using user's session access token for GitHub API.");
+      return account.access_token;
+    }
+  }
+
+  // This is the fallback for requests when the user is not logged in.
+  const appToken = process.env.GITHUB_TOKEN;
+  if (appToken) {
+    console.log("✅ Using app's GITHUB_TOKEN for GitHub API.");
+  } else {
+    // This is the error condition. If you see this, your .env.local is wrong.
+    console.error("❌ CRITICAL: GITHUB_TOKEN is not loaded from .env.local file.");
+  }
+  return appToken || null;
+}
 
 /**
  * API endpoint to proxy GitHub repository API requests
@@ -24,22 +56,7 @@ export async function GET(request: NextRequest) {
     const sort = searchParams.get("sort") || "stars";
     const order = searchParams.get("order") || "desc";
 
-    const session = await auth();
-    let githubToken: string | null = null;
-
-    // CORRECTED: Securely fetch the user's token from the database
-    if (session?.user?.id) {
-      const account = await prisma.account.findFirst({
-        where: {
-          userId: session.user.id,
-          provider: "github",
-        },
-      });
-
-      if (account?.access_token) {
-        githubToken = account.access_token;
-      }
-    }
+    const githubToken = await getToken();
 
     // Check which type of request we need to make
     if (type === "repository" && owner && name) {
@@ -49,81 +66,25 @@ export async function GET(request: NextRequest) {
         name,
         githubToken
       );
-      // NOTE: The `fetchRepositoryByFullName` function in github-api.ts returns a `ProcessedRepo`
-      // which is already in the right format. The client side expects `repository`.
-      return NextResponse.json({ success: true, repository: repo, data: repo }); // Pass as 'repository' and 'data'
+      return NextResponse.json({ success: true, repository: repo, data: repo });
     } else if ((type === "search" || q) && query) {
-      try {
-        const sanitizedQuery = query.trim();
-        const headers = githubAPI.getHeaders(githubToken);
-        const apiUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
-          sanitizedQuery
-        )}&sort=${sort}&order=${order}&per_page=${limit}&page=${page}`;
+      const sanitizedQuery = query.trim();
+      const headers = githubAPI.getHeaders(githubToken);
+      const apiUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
+        sanitizedQuery
+      )}&sort=${sort}&order=${order}&per_page=${limit}&page=${page}`;
 
-        console.log(`Making GitHub API request: ${apiUrl}`);
+      const response = await fetch(apiUrl, { headers });
 
-        const response = await fetch(apiUrl, { headers });
+      await githubAPI.handleGitHubApiResponse(response); // Handle errors
 
-        if (!response.ok) {
-          console.error(
-            `GitHub API error: ${response.status} - ${response.statusText}`
-          );
-          throw new Error(
-            `GitHub API error: ${response.status} - ${response.statusText}`
-          );
-        }
-
-        const data = await response.json();
-        return NextResponse.json({
-          success: true,
-          repositories: data.items || [],
-          data: data.items || [],
-          total_count: data.total_count || 0,
-        });
-      } catch (searchError) {
-        console.error("Search query error:", searchError);
-
-        try {
-          const fallbackQuery = "stars:>50";
-          const headers = githubAPI.getHeaders(githubToken);
-          const apiUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
-            fallbackQuery
-          )}&sort=stars&order=desc&per_page=${limit}&page=1`;
-
-          console.log(`Making fallback GitHub API request: ${apiUrl}`);
-
-          const response = await fetch(apiUrl, { headers });
-
-          if (!response.ok) {
-            return NextResponse.json(
-              {
-                success: false,
-                repositories: [],
-                error: "Failed to fetch repositories even with fallback query",
-              },
-              { status: 500 }
-            );
-          }
-
-          const data = await response.json();
-          return NextResponse.json({
-            success: true,
-            repositories: data.items || [],
-            data: data.items || [],
-            total_count: data.total_count || 0,
-            fallback: true,
-          });
-        } catch (fallbackError) {
-          return NextResponse.json(
-            {
-              success: false,
-              repositories: [],
-              error: "All GitHub API requests failed",
-            },
-            { status: 500 }
-          );
-        }
-      }
+      const data = await response.json();
+      return NextResponse.json({
+        success: true,
+        repositories: data.items || [],
+        data: data.items || [],
+        total_count: data.total_count || 0,
+      });
     } else if (type === "trending") {
       const repos = await githubAPI.fetchTrendingRepos(page, githubToken);
       return NextResponse.json({
@@ -132,43 +93,17 @@ export async function GET(request: NextRequest) {
         data: repos,
       });
     } else if (type === "popular") {
-      try {
-        const repos = await githubAPI.fetchQualityRepos(
-          page,
-          "",
-          false,
-          githubToken
-        );
-
-        if (!repos || repos.length === 0) {
-          return NextResponse.json({
-            success: true,
-            repositories: [],
-            data: [],
-            message: "No popular repositories found",
-          });
-        }
-
-        return NextResponse.json({
-          success: true,
-          repositories: repos,
-          data: repos,
-        });
-      } catch (error) {
-        console.error("Error fetching popular repositories:", error);
-
-        return NextResponse.json(
-          {
-            success: false,
-            repositories: [],
-            error:
-              error instanceof Error
-                ? error.message
-                : "Error fetching popular repositories",
-          },
-          { status: 500 }
-        );
-      }
+      const repos = await githubAPI.fetchQualityRepos(
+        page,
+        "",
+        false,
+        githubToken
+      );
+      return NextResponse.json({
+        success: true,
+        repositories: repos,
+        data: repos,
+      });
     } else {
       return NextResponse.json(
         {
@@ -195,7 +130,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "GitHub API authentication failed. Please login again.",
+          error:
+            "GitHub API authentication failed. Please check your GITHUB_TOKEN.",
         },
         { status: 401 }
       );

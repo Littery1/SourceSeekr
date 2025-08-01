@@ -205,58 +205,30 @@
     }
   }
 
-  // API rate limit handling with caching
-  export async function checkRateLimit(userToken?: string | null): Promise<boolean> {
+  // API rate limit handling 
+  export async function checkRateLimit(
+    userToken?: string | null
+  ): Promise<boolean> {
     try {
-      const now = Date.now();
-      // Only check rate limit once every 5 minutes, unless we're getting low
-      if (now - lastRateLimitCheck > RATE_LIMIT_CACHE_DURATION || remainingRequests < 20) {
-        console.log("Checking GitHub rate limit via API");
-        
-        // On the client-side, use our API endpoint to avoid CORS issues
-        if (typeof window !== 'undefined') {
-          try {
-            const res = await fetch("/api/github/rate-limit");
-            if (!res.ok) {
-              console.error("Error checking rate limit via proxy API:", res.status);
-              return false;
-            }
-            const data = await res.json();
-            if (!data.success) {
-              return false;
-            }
-            remainingRequests = 100; // Arbitrary number since we don't get the actual count
-            lastRateLimitCheck = now;
-            return data.hasQuota;
-          } catch (err) {
-            console.error("Failed to check rate limit via proxy:", err);
-            return false;
-          }
-        } else {
-          // Server-side direct API call
-          const res = await fetch("https://api.github.com/rate_limit", {
-            headers: getHeaders(userToken)
-          });
-          
-          if (!res.ok) {
-            // If unauthorized, assume we can't make requests
-            if (res.status === 401 || res.status === 403) {
-              console.error("GitHub authentication error during rate limit check:", res.status);
-              return false;
-            }
-            throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
-          }
-          
-          const data = await res.json();
-          remainingRequests = data.resources.core.remaining;
-          lastRateLimitCheck = now;
-          console.log(`GitHub API rate limit: ${remainingRequests} requests remaining`);
+      const res = await fetch("https://api.github.com/rate_limit", {
+        headers: getHeaders(userToken),
+      });
+
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          console.error(
+            "GitHub authentication error during rate limit check:",
+            res.status
+          );
+          return false;
         }
-      } else {
-        // Decrement our cached count each time to be conservative
-        remainingRequests -= 1;
+        throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
       }
-      return remainingRequests > 10;
+
+      const data = await res.json();
+      const remaining = data.resources.core.remaining;
+      console.log(`GitHub API rate limit: ${remaining} requests remaining`);
+      return remaining > 10;
     } catch (error) {
       console.error("Error checking rate limit:", error);
       return false;
@@ -371,94 +343,70 @@
     }
   }
 
-  // Get headers with authorization if token exists
-  // Update the getHeaders function
-  export function getHeaders(userToken?: string | null): HeadersInit {
-    // Try to use the user's GitHub token first, if available from their session
-    // Fall back to the app's token from environment variables
-    const token = userToken || process.env.GITHUB_TOKEN;
-    
-    const headers: HeadersInit = {
-      // Always include required headers according to GitHub API docs
-      'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'SourceSeekr-App'
-    };
-    
-    if (token) {
-      // Modern Bearer token authentication format
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    return headers;
+export function getHeaders(token?: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "SourceSeekr-App",
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
+
+  return headers;
+}
 
   /**
    * Fetch popular repositories based on stars, with optional query and filters
    */
-   export async function fetchQualityRepos(
-     page = 1,
-     query: string = "",
-     beginnerFriendly: boolean = false,
-     userToken?: string | null
-   ): Promise<GitHubRepo[]> {
-     const cacheKey = `${query}_${beginnerFriendly ? "beginner" : "all"}`;
-     const cachedEntry = repoCache.popular[page]?.[cacheKey];
-     if (cachedEntry && isCacheValid(cachedEntry)) {
-       return cachedEntry.data;
-     }
+// lib/github-api.ts
 
-     if (!(await checkRateLimit(userToken))) {
-       throw new GitHubRateLimitError();
-     }
+export async function fetchQualityRepos(
+  page = 1,
+  query: string = "",
+  beginnerFriendly: boolean = false,
+  userToken?: string | null
+): Promise<GitHubRepo[]> {
+  let searchQuery = query.trim() || "stars:>100";
+  if (beginnerFriendly) {
+    searchQuery += " good-first-issues:>0";
+  }
 
-     let searchQuery = query.trim() || "stars:>100";
-     if (beginnerFriendly && !searchQuery.includes("good-first-issues")) {
-       searchQuery += " good-first-issues:>0";
-     }
+  try {
+    const apiUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
+      searchQuery
+    )}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`;
 
-     // This is the main fix: Always call the external GitHub API directly.
-     // Never fetch from our own '/api/github/repos' inside this file.
-     try {
-       apiCallStats.trackCall(`search/repositories:${searchQuery}`);
-       const res = await fetch(
-         `https://api.github.com/search/repositories?q=${encodeURIComponent(
-           searchQuery
-         )}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`,
-         { headers: getHeaders(userToken) }
-       );
+    // The userToken here is what we get from the getToken() function in the API route.
+    const headers = getHeaders(userToken);
+    
+    // This log will tell us if the Authorization header is actually being sent.
+    if (headers.Authorization) {
+        console.log(`🚀 Fetching from GitHub with Authorization header.`);
+    } else {
+        console.warn(`🚨 Fetching from GitHub WITHOUT Authorization header. This will likely fail or be rate-limited.`);
+    }
 
-       if (!res.ok) {
-         throw new Error(
-           `Failed to fetch repositories: ${res.status} ${res.statusText}`
-         );
-       }
+    const res = await fetch(apiUrl, { headers });
 
-       const data = await res.json();
-       const filteredRepos = (data.items || []).filter(
-         (repo: GitHubRepo) =>
-           !BANNED_KEYWORDS.some(
-             (keyword) =>
-               repo.name.toLowerCase().includes(keyword) ||
-               (repo.description?.toLowerCase() || "").includes(keyword)
-           )
-       );
+    // Use the error handler to check the response
+    await handleGitHubApiResponse(res);
 
-       if (!repoCache.popular[page]) {
-         repoCache.popular[page] = {};
-       }
-       repoCache.popular[page][cacheKey] = {
-         data: filteredRepos,
-         timestamp: Date.now(),
-       };
-
-       return filteredRepos;
-     } catch (error) {
-       console.error("Error fetching quality repositories:", error);
-       return []; // Return empty on error instead of re-throwing
-     }
-   }
-
+    const data = await res.json();
+    return (data.items || []).filter(
+      (repo: GitHubRepo) =>
+        !BANNED_KEYWORDS.some(
+          (keyword) =>
+            repo.name.toLowerCase().includes(keyword) ||
+            (repo.description?.toLowerCase() || "").includes(keyword)
+        )
+    );
+  } catch (error) {
+    console.error("🔥 Error in fetchQualityRepos:", error);
+    throw error; // Re-throw the error to be handled by the API route
+  }
+}
   /**
    * Fetch trending repositories (created in the last month)
    */

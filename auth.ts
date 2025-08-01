@@ -1,9 +1,10 @@
+// auth.ts
+
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import prisma from "./prisma/prisma";
 
-// --- Environment Variable Validation ---
 const GITHUB_CLIENT_ID = process.env.AUTH_GITHUB_ID;
 const GITHUB_CLIENT_SECRET = process.env.AUTH_GITHUB_SECRET;
 const AUTH_SECRET = process.env.AUTH_SECRET;
@@ -24,12 +25,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     GitHub({
       clientId: GITHUB_CLIENT_ID,
       clientSecret: GITHUB_CLIENT_SECRET,
+      // We removed the invalid "allowUnsafeEmailLinking" line from here.
+      authorization: {
+        params: {
+          scope: "read:user user:email public_repo",
+        },
+      },
     }),
   ],
   session: {
-    strategy: "database", // Use database sessions to stay within cookie size limits
+    strategy: "database",
   },
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account && account.provider === "github") {
+        console.log("--- GitHub Sign-In Data Received ---");
+        console.log("User Object:", user);
+        console.log("Account Object (contains tokens):", account);
+        console.log("------------------------------------");
+      }
+      return true;
+    },
     async session({ session, user }) {
       if (session.user && user) {
         session.user.id = user.id;

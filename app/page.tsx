@@ -173,7 +173,9 @@ const PopularRepositoriesCarousel = () => {
                   />
                   <div>
                     <Link
-                      href={`/repository/${getOwnerLogin(currentRepo.owner)}/${currentRepo.name}`}
+                      href={`/repository/${getOwnerLogin(currentRepo.owner)}/${
+                        currentRepo.name
+                      }`}
                       className="font-medium text-xl hover:text-primary transition-colors"
                     >
                       {currentRepo.name}
@@ -265,7 +267,7 @@ const PopularRepositoriesCarousel = () => {
                       />
                     </svg>
                     <span className="text-lg font-semibold">
-                      {formatNumber(currentRepo.stargazers_count)}
+                      {currentRepo.stars}{" "}
                     </span>
                   </div>
                   <span className="text-xs text-muted-foreground">Stars</span>
@@ -285,9 +287,7 @@ const PopularRepositoriesCarousel = () => {
                         clipRule="evenodd"
                       />
                     </svg>
-                    <span className="text-lg font-semibold">
-                      {formatNumber(currentRepo.forks_count)}
-                    </span>
+                    <span className="text-lg font-semibold">{currentRepo.forks}</span>
                   </div>
                   <span className="text-xs text-muted-foreground">Forks</span>
                 </div>
@@ -307,7 +307,7 @@ const PopularRepositoriesCarousel = () => {
                       />
                     </svg>
                     <span className="text-lg font-semibold">
-                      {formatNumber(currentRepo.open_issues_count)}
+                      {currentRepo.open_issues}
                     </span>
                   </div>
                   <span className="text-xs text-muted-foreground">Issues</span>
@@ -316,7 +316,9 @@ const PopularRepositoriesCarousel = () => {
 
               <div className="flex justify-between">
                 <Link
-                  href={`/repository/${getOwnerLogin(currentRepo.owner)}/${currentRepo.name}`}
+                  href={`/repository/${getOwnerLogin(currentRepo.owner)}/${
+                    currentRepo.name
+                  }`}
                   className="btn btn-primary flex-1 mr-2"
                 >
                   View Details
@@ -670,7 +672,7 @@ export async function fetchRepositories(language, stars, page = 1) {
 }
 
 function App() {
-  const [repos, setRepos] = useState<any[]>([]);
+const [repos, setRepos] = useState<githubAPI.ProcessedRepo[]>([]);
   const [loading, setLoading] = useState(false);
   
   useEffect(() => {

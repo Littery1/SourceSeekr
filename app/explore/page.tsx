@@ -123,152 +123,90 @@ export default function ExplorePage() {
   const [rateLimitError, setRateLimitError] = useState(false);
   const [rateLimitMessage, setRateLimitMessage] = useState("");
 
-  // Function to fetch repositories with active filters - wrapped in useCallback to prevent re-creation
-  const fetchRepositories = useCallback(async (page = 1) => {
-    try {
-      setLoading(true);
-
-      // Import the GitHub API functions
-      const { fetchQualityRepos, processRepositoriesData } = await import(
-        "@/lib/github-api"
-      );
-
-      // Build the query string with active filters
-      let query = "";
-      
-      // Add language filter if selected
-      if (activeFilters.languageFilter !== "all") {
-        query += `language:${activeFilters.languageFilter.toLowerCase()} `;
-      }
-      
-      // Add topic filter if selected
-      if (activeFilters.topicFilter !== "all") {
-        query += `topic:${activeFilters.topicFilter} `;
-      }
-      
-      // Add search term if provided
-      if (activeFilters.searchTerm.trim()) {
-        query += activeFilters.searchTerm.trim();
-      }
-      
-      // Ensure we have some query
-      query = query.trim();
-      
-      // If no query is provided, use a default query to avoid empty searches
-      if (!query) {
-        query = "stars:>100";
-      }
-
-      console.log("Searching with query:", query);
-      
+  const fetchRepositories = useCallback(
+    async (page = 1) => {
       try {
-        // Fetch repositories with query
-        const fetchedRepos = await fetchQualityRepos(
-          page,
-          query,
-          activeFilters.beginnerFriendly
-        );
-        const processedRepos = await processRepositoriesData(fetchedRepos, {
-          maxRepos: 15,
+        setLoading(true);
+
+        // Build the query string for our API
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: "15",
+          sort: activeFilters.sortBy,
         });
 
-        // Format repositories to match your interface
-        const formattedRepos = processedRepos.map((repo) => ({
-          id: repo.id,
-          repoId: repo.id,
-          name: repo.name,
-          owner: getOwnerLogin(repo.owner),
-          fullName: `${getOwnerLogin(repo.owner)}/${repo.name}`,
-          description: repo.description,
-          language: repo.language,
-          stars:
-            typeof repo.stars === "string" ? parseInt(repo.stars) : repo.stars,
-          forks:
-            typeof repo.forks === "string" ? parseInt(repo.forks) : repo.forks,
-          issues:
-            typeof repo.issuesCount === "string"
-              ? parseInt(repo.issuesCount.replace(/[^\d]/g, "")) || 0
-              : repo.issuesCount || 0,
-          ownerAvatar: repo.ownerAvatar,
-          topics: repo.topics || [],
-          size:
-            typeof repo.size === "string"
-              ? parseInt(repo.size)
-              : repo.size || 0,
-          url: `https://github.com/${
-            typeof repo.owner === "object" ? repo.owner.login : repo.owner
-          }/${repo.name}`,
-          homepage: repo.homepage,
-          license: repo.license,
-          updatedAt: new Date(repo.updatedAt || Date.now()),
-          createdAt: new Date(repo.createdAt || Date.now()),
-        }));
-
-        if (page === 1) {
-          setRepositories(formattedRepos);
-        } else {
-          setRepositories((prev) => [...prev, ...formattedRepos]);
+        let query = activeFilters.searchTerm.trim();
+        if (activeFilters.languageFilter !== "all") {
+          query += ` language:${activeFilters.languageFilter.toLowerCase()}`;
+        }
+        if (activeFilters.topicFilter !== "all") {
+          query += ` topic:${activeFilters.topicFilter}`;
+        }
+        if (activeFilters.beginnerFriendly) {
+          query += " good-first-issues:>0";
         }
 
-        setCurrentPage(page);
-        setHasMore(formattedRepos.length > 0);
-      } catch (apiError) {
-        console.error("GitHub API error:", apiError);
-        
-        // If there was an error with the specific query, try a basic fallback query
-        if (query) {
-          console.log("Trying fallback query...");
-          const fallbackRepos = await fetchQualityRepos(1, "", false);
-          const processedRepos = await processRepositoriesData(fallbackRepos, {
-            maxRepos: 10,
-          });
+        if (!query) {
+          query = "stars:>100";
+        }
 
-          // Process fallback repos
-          const formattedRepos = processedRepos.map((repo) => ({
-            id: repo.id,
-            repoId: repo.id,
-            name: repo.name,
-            owner: typeof repo.owner === 'object' ? repo.owner.login : repo.owner,
-            fullName: `${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`,
-            description: repo.description,
-            language: repo.language,
-            stars:
-              typeof repo.stars === "string" ? parseInt(repo.stars) : repo.stars,
-            forks:
-              typeof repo.forks === "string" ? parseInt(repo.forks) : repo.forks,
-            issues:
-              typeof repo.issuesCount === "string"
-                ? parseInt(repo.issuesCount.replace(/[^\d]/g, "")) || 0
-                : repo.issuesCount || 0,
-            ownerAvatar: repo.ownerAvatar,
-            topics: repo.topics || [],
-            size:
-              typeof repo.size === "string"
-                ? parseInt(repo.size)
-                : repo.size || 0,
-            url: `https://github.com/${typeof repo.owner === 'object' ? repo.owner.login : repo.owner}/${repo.name}`,
-            homepage: repo.homepage,
-            license: repo.license,
+        params.set("q", query);
+
+        const response = await fetch(`/api/github/repos?${params.toString()}`);
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.error ||
+              `Failed to fetch repositories: ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          const formattedRepos = data.data.map((repo: any) => ({
+            ...repo,
+            stars: parseInt(
+              String(repo.stars).replace(/[kM]/, (m: string) =>
+                m === "k" ? "000" : "000000"
+              )
+            ),
+            forks: parseInt(
+              String(repo.forks).replace(/[kM]/, (m: string) =>
+                m === "k" ? "000" : "000000"
+              )
+            ),
+            issues: parseInt(
+              String(repo.issuesCount).replace(/[kM]/, (m: string) =>
+                m === "k" ? "000" : "000000"
+              )
+            ),
             updatedAt: new Date(repo.updatedAt || Date.now()),
             createdAt: new Date(repo.createdAt || Date.now()),
           }));
-          
-          setRepositories(formattedRepos);
-          setHasMore(true);
-        } else {
-          throw apiError; // If fallback query also fails, re-throw the error
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching repositories:", error);
-      // Fallback data in case of error
-      setRepositories([]);
-      setHasMore(false);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeFilters]);
 
+          if (page === 1) {
+            setRepositories(formattedRepos);
+          } else {
+            setRepositories((prev) => [...prev, ...formattedRepos]);
+          }
+          setHasMore(formattedRepos.length > 0);
+        } else {
+          if (page === 1) setRepositories([]);
+          setHasMore(false);
+        }
+      } catch (error) {
+        console.error("Error fetching repositories:", error);
+        if (page === 1) setRepositories([]);
+        setHasMore(false);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [activeFilters]
+  );
   // Handle initial load - using useCallback to prevent recreation of function
   const fetchInitialRepositories = useCallback(() => {
     fetchRepositories(1);
