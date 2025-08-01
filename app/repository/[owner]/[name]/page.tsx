@@ -791,7 +791,11 @@ useEffect(() => {
           <div className="flex items-center gap-4">
             <Image
               src={repository.ownerAvatar}
-              alt={`${typeof repository.owner === 'object' ? repository.owner.login : owner} avatar`}
+              alt={`${
+                typeof repository.owner === "object"
+                  ? repository.owner.login
+                  : owner
+              } avatar`}
               width={64}
               height={64}
               className="rounded-lg border-2 border-primary/20"
@@ -799,12 +803,14 @@ useEffect(() => {
             />
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
-                <Link
-                  href={`/profile/${owner}`}
+                <a
+                  href={`https://github.com/${owner}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="hover:text-primary transition-colors"
                 >
                   {owner}
-                </Link>
+                </a>
                 <span className="text-muted-foreground">/</span>
                 <span className="text-primary">{name}</span>
               </h1>
@@ -880,16 +886,16 @@ useEffect(() => {
                 </svg>
                 View on GitHub
               </a>
-              
+
               <a
                 href={`https://github.com/${owner}/${name}/issues`}
-                target="_blank" 
+                target="_blank"
                 rel="noopener noreferrer"
                 className="btn btn-ghost btn-sm"
               >
                 Issues
               </a>
-              
+
               <a
                 href={`https://github.com/${owner}/${name}/pulls`}
                 target="_blank"

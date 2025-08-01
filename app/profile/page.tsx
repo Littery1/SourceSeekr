@@ -94,23 +94,33 @@ export default function ProfilePage() {
             followers: 87,
             following: 45,
             avatar_url: session.user?.image || "/images/default.png",
-            html_url: `https://github.com/${session.user?.email?.split('@')[0] || session.user?.name || "user"}`
+            html_url: `https://github.com/${
+              session.user?.email?.split("@")[0] || session.user?.name || "user"
+            }`,
           };
-          
+
           setUserData(mockUserData);
-          
+
           // Mock language data
           const mockLanguages: LanguageStats[] = [
-            { language: "TypeScript", percentage: 38, color: languageColors.TypeScript },
-            { language: "JavaScript", percentage: 28, color: languageColors.JavaScript },
+            {
+              language: "TypeScript",
+              percentage: 38,
+              color: languageColors.TypeScript,
+            },
+            {
+              language: "JavaScript",
+              percentage: 28,
+              color: languageColors.JavaScript,
+            },
             { language: "HTML", percentage: 15, color: languageColors.HTML },
             { language: "CSS", percentage: 12, color: languageColors.CSS },
-            { language: "Python", percentage: 7, color: languageColors.Python }
+            { language: "Python", percentage: 7, color: languageColors.Python },
           ];
-          
+
           setLanguages(mockLanguages);
-          
-          // Load preferences from localStorage
+
+                    // Load preferences from localStorage
           const savedPreferences = localStorage.getItem('sourceseekr-preferences');
           if (savedPreferences) {
             setPreferences(JSON.parse(savedPreferences));
@@ -121,7 +131,9 @@ export default function ProfilePage() {
               .map(lang => lang.language);
               
             const defaultPrefs = {
-              ...preferences,
+              interests: [],
+              skillLevel: "intermediate",
+              looking: [],
               preferredLanguages: defaultPreferredLanguages
             };
             
@@ -140,8 +152,7 @@ export default function ProfilePage() {
 
       fetchUserData();
     }
-  }, [session, status, router, preferences]);
-
+  }, [session, status, router]);
   const handleInterestToggle = (interest: string) => {
     setPreferences(prev => {
       const newInterests = prev.interests.includes(interest)

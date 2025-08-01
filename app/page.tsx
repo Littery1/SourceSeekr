@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import type { ProcessedRepo } from "@/lib/github-api";
+import { formatNumber, type ProcessedRepo } from "@/lib/github-api";
 
 // Helper function to safely get the owner's login name
 const getOwnerLogin = (owner: string | { login: string }): string => {
@@ -18,7 +18,7 @@ const getOwnerLogin = (owner: string | { login: string }): string => {
 
 // Repository Carousel Component
 const PopularRepositoriesCarousel = () => {
-  const [repos, setRepos] = useState<ProcessedRepo[]>([]);
+  const [repos, setRepos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
@@ -164,13 +164,8 @@ const PopularRepositoriesCarousel = () => {
             <div className="bg-card rounded-xl border border-border shadow-lg p-6 h-full">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
-                  
                   <Image
-                    src={
-                      currentRepo.ownerAvatar
-                        ? currentRepo.ownerAvatar
-                        : "/images/github.svg"
-                    }
+                    src={currentRepo.owner?.avatar_url || "/images/github.svg"}
                     width={56}
                     height={56}
                     alt={`${getOwnerLogin(currentRepo.owner)} avatar`}
@@ -178,11 +173,11 @@ const PopularRepositoriesCarousel = () => {
                   />
                   <div>
                     <Link
-                      href={`/repository/${getOwnerLogin(currentRepo.owner)}/${
-                        currentRepo.name
-                      }`}
+                      href={`/repository/${getOwnerLogin(currentRepo.owner)}/${currentRepo.name}`}
                       className="font-medium text-xl hover:text-primary transition-colors"
-                    ></Link>
+                    >
+                      {currentRepo.name}
+                    </Link>
                     <div className="text-sm text-muted-foreground hover:text-foreground/80 transition-colors">
                       by{" "}
                       <span className="hover:text-primary transition-colors">
@@ -270,7 +265,7 @@ const PopularRepositoriesCarousel = () => {
                       />
                     </svg>
                     <span className="text-lg font-semibold">
-                      {currentRepo.stars}
+                      {formatNumber(currentRepo.stargazers_count)}
                     </span>
                   </div>
                   <span className="text-xs text-muted-foreground">Stars</span>
@@ -291,7 +286,7 @@ const PopularRepositoriesCarousel = () => {
                       />
                     </svg>
                     <span className="text-lg font-semibold">
-                      {currentRepo.forks}
+                      {formatNumber(currentRepo.forks_count)}
                     </span>
                   </div>
                   <span className="text-xs text-muted-foreground">Forks</span>
@@ -312,7 +307,7 @@ const PopularRepositoriesCarousel = () => {
                       />
                     </svg>
                     <span className="text-lg font-semibold">
-                      {currentRepo.issuesCount}
+                      {formatNumber(currentRepo.open_issues_count)}
                     </span>
                   </div>
                   <span className="text-xs text-muted-foreground">Issues</span>
@@ -321,17 +316,13 @@ const PopularRepositoriesCarousel = () => {
 
               <div className="flex justify-between">
                 <Link
-                  href={`/repository/${getOwnerLogin(currentRepo.owner)}/${
-                    currentRepo.name
-                  }`}
+                  href={`/repository/${getOwnerLogin(currentRepo.owner)}/${currentRepo.name}`}
                   className="btn btn-primary flex-1 mr-2"
                 >
                   View Details
                 </Link>
                 <a
-                  href={`https://github.com/${getOwnerLogin(
-                    currentRepo.owner
-                  )}/${currentRepo.name}`}
+                  href={currentRepo.html_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-outline flex-1 ml-2"
@@ -512,7 +503,9 @@ export default function HomePage() {
           />
           <div>
             <Link
-              href={`/repository/${repo.owner}/${repo.name}`}
+              href={`/repository/${getOwnerLogin(repo.owner as any)}/${
+                repo.name
+              }`}
               className="font-medium text-lg hover:text-primary transition-colors duration-200"
             >
               {repo.name}
@@ -677,7 +670,7 @@ export async function fetchRepositories(language, stars, page = 1) {
 }
 
 function App() {
-  const [repos, setRepos] = useState<ProcessedRepo[]>([]);
+  const [repos, setRepos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
   useEffect(() => {

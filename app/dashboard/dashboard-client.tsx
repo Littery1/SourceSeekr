@@ -7,34 +7,11 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { formatNumber } from "@/lib/github-api";
 
-interface Repository {
-  id: number;
-  name: string;
-  fullName: string;
-  description: string | null;
-  stars: string;
-  forks: string;
-  pullRequests: string;
-  issuesCount: string;
-  issues: string[];
-  language: string | null;
-  ownerAvatar: string;
-  owner: string;
-  contributors: any[];
-  topics: string[];
-  homepage: string | null;
-  createdAt: string;
-  updatedAt: string;
-  license: string | null;
-  size: number;
-  readme: string | null;
-  defaultBranch: string;
-}
+
 
 export default function DashboardClient({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
-  const [recommendedRepos, setRecommendedRepos] = useState<Repository[]>([]);
-  const [repoReasons, setRepoReasons] = useState<Record<string, string>>({});
+  const [recommendedRepos, setRecommendedRepos] = useState<any[]>([]);  const [repoReasons, setRepoReasons] = useState<Record<string, string>>({});
   const [savedRepos, setSavedRepos] = useState<Set<string>>(new Set());
   const [rateLimitError, setRateLimitError] = useState(false);
   const [userPreferences, setUserPreferences] = useState<{
@@ -398,8 +375,8 @@ export default function DashboardClient({ session }: { session: Session }) {
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div className="flex items-start gap-4">
                   <Image
-                    src={repo.ownerAvatar}
-                    alt={`${repo.owner} avatar`}
+                    src={repo.owner.avatar_url}
+                    alt={`${getOwnerLogin(repo.owner)} avatar`}
                     width={48}
                     height={48}
                     className="rounded-lg border border-border"
@@ -407,12 +384,12 @@ export default function DashboardClient({ session }: { session: Session }) {
                   <div>
                     <h2 className="text-xl font-bold flex flex-wrap items-center gap-2 mb-1">
                       <Link
-                        href={`/repository/${getOwnerLogin(
-                          repo.owner as any
-                        )}/${repo.name}`}
+                        href={`/repository/${getOwnerLogin(repo.owner)}/${
+                          repo.name
+                        }`}
                         className="hover:text-primary transition-colors"
                       >
-                        {getOwnerLogin(repo.owner as any)}/{repo.name}
+                        {repo.full_name}
                       </Link>
                     </h2>
                     <p className="text-muted-foreground mb-2">
@@ -446,7 +423,9 @@ export default function DashboardClient({ session }: { session: Session }) {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <span className="text-sm">{repo.stars}</span>
+                        <span className="text-sm">
+                          {formatNumber(repo.stargazers_count)}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -462,7 +441,9 @@ export default function DashboardClient({ session }: { session: Session }) {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <span className="text-sm">{repo.forks}</span>
+                        <span className="text-sm">
+                          {formatNumber(repo.forks_count)}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -478,13 +459,15 @@ export default function DashboardClient({ session }: { session: Session }) {
                             clipRule="evenodd"
                           />
                         </svg>
-                        <span className="text-sm">{repo.issuesCount}</span>
+                        <span className="text-sm">
+                          {formatNumber(repo.open_issues_count)}
+                        </span>
                       </div>
                     </div>
 
                     {/* Topics */}
                     <div className="flex flex-wrap gap-2 mb-3">
-                      {repo.topics.slice(0, 5).map((topic) => (
+                      {(repo.topics || []).slice(0, 5).map((topic: string) => (
                         <span
                           key={topic}
                           className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
@@ -492,7 +475,7 @@ export default function DashboardClient({ session }: { session: Session }) {
                           {topic}
                         </span>
                       ))}
-                      {repo.topics.length > 5 && (
+                      {repo.topics && repo.topics.length > 5 && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
                           +{repo.topics.length - 5} more
                         </span>
@@ -503,15 +486,15 @@ export default function DashboardClient({ session }: { session: Session }) {
 
                 <div className="flex flex-row md:flex-col gap-3 min-w-[130px]">
                   <Link
-                    href={`/repository/${String(repo.owner)}/${String(
+                    href={`/repository/${getOwnerLogin(repo.owner)}/${
                       repo.name
-                    )}`}
+                    }`}
                     className="btn btn-primary btn-sm flex-1"
                   >
                     View Details
                   </Link>
                   <a
-                    href={`https://github.com/${repo.owner}/${repo.name}`}
+                    href={repo.html_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn-outline btn-sm flex-1"

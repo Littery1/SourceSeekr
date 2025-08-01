@@ -57,19 +57,19 @@ export default function SavedPage() {
           throw new Error(`Failed to fetch saved repositories: ${res.status}`);
         }
 
-               const data = await res.json();
+                            const data = await res.json();
 
-               // The API returns the array directly.
-               const savedRepoData = Array.isArray(data) ? data : [];
+                            // The API returns an object with a `repositories` property
+                            const savedRepoData = data.repositories || [];
 
-               // The repository data is nested inside each item
-               setRepositories(
-                 savedRepoData.map((item: any) => ({
-                   ...item.repository,
-                   savedAt: new Date(item.createdAt), // The save date is on the parent object
-                   notes: item.notes,
-                 }))
-               );
+                            // The repository data is nested inside each item
+                            setRepositories(
+                              savedRepoData.map((item: any) => ({
+                                ...item.repository,
+                                savedAt: new Date(item.createdAt), // The save date is on the parent object
+                                notes: item.notes,
+                              }))
+                            );
       } catch (error) {
         console.error("Error fetching saved repositories:", error);
       } finally {

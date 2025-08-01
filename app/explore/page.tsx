@@ -797,7 +797,7 @@ export default function ExplorePage() {
                           href={`/repository/${repo.owner}/${repo.name}`}
                           className="hover:text-primary transition-colors"
                         >
-                          {repo.owner}/{repo.name}
+                          {repo.fullName}
                         </Link>
                         {repo.topics.some(
                           (topic) =>

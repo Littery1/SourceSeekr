@@ -8,8 +8,6 @@ interface UserPreferences {
   preferredLanguages: string[];
 }
 
-
-
 // This is a mock function that would actually connect to Deepseek in a real implementation
 export async function getRecommendedRepositories(
   userPreferences: UserPreferences,
@@ -18,7 +16,7 @@ export async function getRecommendedRepositories(
 ): Promise<ProcessedRepo[]> {
   // This would be a real API call to Deepseek
   // For now, we'll simulate by filtering repositories
-  
+
   try {
     // Import GitHub API functions
     const {
@@ -119,73 +117,112 @@ export async function getRecommendedRepositories(
 }
 // Generate a personalized explanation for why a repository is recommended
 export function getRecommendationReason(
-  repo: ProcessedRepo,
+  repo: any, // Use `any` to accept both raw and processed repo types
   userPreferences: UserPreferences
 ): string {
   const reasons = [];
-  
+  const repoTopics = repo.topics || [];
+
   // Check language match
-  if (repo.language && userPreferences.preferredLanguages.includes(repo.language)) {
+  if (
+    repo.language &&
+    userPreferences.preferredLanguages.includes(repo.language)
+  ) {
     reasons.push(`Uses ${repo.language}, one of your preferred languages`);
   }
-  
+
   // Check topic match with interests
   const interestKeywords: Record<string, string[]> = {
-    "Web Development": ["web", "frontend", "backend", "javascript", "html", "css"],
+    "Web Development": [
+      "web",
+      "frontend",
+      "backend",
+      "javascript",
+      "html",
+      "css",
+    ],
     "Mobile Apps": ["mobile", "android", "ios", "flutter", "react-native"],
     "Data Science": ["data", "analytics", "visualization", "pandas", "jupyter"],
-    "Machine Learning": ["ml", "machine-learning", "ai", "tensorflow", "pytorch"],
+    "Machine Learning": [
+      "ml",
+      "machine-learning",
+      "ai",
+      "tensorflow",
+      "pytorch",
+    ],
     "Game Development": ["game", "unity", "gamedev", "unreal"],
-    "DevOps": ["devops", "ci-cd", "docker", "kubernetes", "automation"],
-    "Security": ["security", "crypto", "authentication", "authorization"],
-    "Backend": ["backend", "api", "database", "server"],
-    "Frontend": ["frontend", "ui", "ux", "interface"],
+    DevOps: ["devops", "ci-cd", "docker", "kubernetes", "automation"],
+    Security: ["security", "crypto", "authentication", "authorization"],
+    Backend: ["backend", "api", "database", "server"],
+    Frontend: ["frontend", "ui", "ux", "interface"],
     "UI/UX": ["ui", "ux", "design", "interface"],
     "Cloud Computing": ["cloud", "aws", "azure", "gcp"],
-    "Blockchain": ["blockchain", "crypto", "web3", "ethereum"],
-    "IoT": ["iot", "embedded", "hardware", "sensors"],
-    "AR/VR": ["ar", "vr", "augmented-reality", "virtual-reality"]
+    Blockchain: ["blockchain", "crypto", "web3", "ethereum"],
+    IoT: ["iot", "embedded", "hardware", "sensors"],
+    "AR/VR": ["ar", "vr", "augmented-reality", "virtual-reality"],
   };
-  
+
   for (const interest of userPreferences.interests) {
     const keywords = interestKeywords[interest] || [];
-    const matchingTopics = repo.topics.filter(topic => 
-      keywords.some(keyword => topic.toLowerCase().includes(keyword.toLowerCase()))
+    const matchingTopics = repoTopics.filter((topic: string) =>
+      keywords.some((keyword) =>
+        topic.toLowerCase().includes(keyword.toLowerCase())
+      )
     );
-    
+
     if (matchingTopics.length > 0) {
       reasons.push(`Matches your interest in ${interest}`);
       break;
     }
   }
-  
+
   // Check for beginner friendliness
-  if (userPreferences.skillLevel === "beginner" && 
-      repo.topics.some(topic => topic.includes("beginner") || topic.includes("good-first-issue"))) {
+  if (
+    userPreferences.skillLevel === "beginner" &&
+    repoTopics.some(
+      (topic: string) =>
+        topic.includes("beginner") || topic.includes("good-first-issue")
+    )
+  ) {
     reasons.push("Beginner-friendly with labeled issues");
   }
-  
+
   // Check for documentation
-  if (userPreferences.looking.includes("Documentation") && 
-      repo.topics.some(topic => topic.includes("documentation") || topic.includes("docs"))) {
+  if (
+    userPreferences.looking.includes("Documentation") &&
+    repoTopics.some(
+      (topic: string) =>
+        topic.includes("documentation") || topic.includes("docs")
+    )
+  ) {
     reasons.push("Has well-maintained documentation");
   }
-  
+
   // Check for size and complexity
-  if (userPreferences.skillLevel === "beginner" && repo.size < 50000) {
+  const repoSize = repo.size || repo.diskUsage || 0; // Handle different property names
+  if (userPreferences.skillLevel === "beginner" && repoSize < 50000) {
     reasons.push("Smaller codebase, easier to understand");
   }
-  
+
   // Add popularity reason if the repo has many stars
-  const starsNum = parseInt(repo.stars.replace('k', '000').replace('M', '000000'));
+  const starsValue = repo.stargazers_count ?? repo.stars;
+  const starsNum =
+    typeof starsValue === "string"
+      ? parseInt(
+          starsValue.replace(/[kM]/g, (m: string) =>
+            m === "k" ? "000" : "000000"
+          )
+        )
+      : Number(starsValue) || 0;
+
   if (starsNum > 1000) {
-    reasons.push(`Popular with ${repo.stars} stars`);
+    reasons.push(`Popular with ${formatNumber(starsNum)} stars`);
   }
-  
+
   // If all else fails, provide a generic reason
   if (reasons.length === 0) {
     reasons.push("Matches your overall profile");
   }
-  
+
   return reasons.slice(0, 2).join(". ");
 }
