@@ -9,6 +9,9 @@ const GITHUB_CLIENT_ID = process.env.AUTH_GITHUB_ID;
 const GITHUB_CLIENT_SECRET = process.env.AUTH_GITHUB_SECRET;
 const AUTH_SECRET = process.env.AUTH_SECRET;
 
+// Define the application's base URL from the new environment variable
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
+
 if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
   throw new Error(
     "Missing GitHub OAuth credentials (AUTH_GITHUB_ID or AUTH_GITHUB_SECRET)"
@@ -19,10 +22,16 @@ if (!AUTH_SECRET) {
   throw new Error("Missing AUTH_SECRET environment variable");
 }
 
-// We no longer need to check for AUTH_URL here, as NextAuth defaults well.
+if (!APP_URL) {
+  // This will cause the build to fail if the variable is missing, which is good.
+  throw new Error("Missing NEXT_PUBLIC_APP_URL environment variable");
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
+  // By setting a base path, we provide a stable URL for all auth operations,
+  // preventing reliance on dynamic headers or Vercel's runtime variables.
+  basePath: "/api/auth",
   providers: [
     GitHub({
       clientId: GITHUB_CLIENT_ID,
@@ -58,7 +67,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   secret: AUTH_SECRET,
-  // By explicitly setting trustHost, we avoid reliance on Vercel's build-time variables.
-  // NEXTAUTH_URL will be used instead, which you have correctly set in Vercel's dashboard.
+  // trustHost is still good practice.
   trustHost: true,
 });
