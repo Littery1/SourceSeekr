@@ -8,9 +8,14 @@ generator client {
 }
 
 
+// prisma/schema.prisma
+
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Use our new custom POOLED variable for the live app on Vercel.
+  url      = env("POOLED_DATABASE_URL")
+  // Use the Vercel-provided direct URL for migrations during the build process.
+  directUrl = env("DATABASE_URL")
 }
 
 model User {
