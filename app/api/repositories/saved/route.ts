@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/prisma/prisma";
 
+export const dynamic = "force-dynamic";
 export const runtime = "nodejs"; // 'edge' is not supported by Prisma
 
 export async function GET(req: NextRequest) {

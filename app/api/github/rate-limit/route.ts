@@ -3,8 +3,8 @@ import { auth } from "@/auth";
 import * as githubAPI from "@/lib/github-api";
 import prisma from "@/prisma/prisma";
 
-export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 // Helper function to get the correct token
 async function getToken() {

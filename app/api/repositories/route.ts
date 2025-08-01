@@ -5,6 +5,7 @@ import { getRepositories, storeRepositories, getRepositoriesCount, isRepositoryS
 import { auth } from '@/auth';
 import { getPersonalizedRepositories } from '@/lib/deepseek-service';
 
+export const dynamic = "force-dynamic";
 export const runtime = 'nodejs'; // 'edge' is not supported by Prisma
 
 // Mock function for getting GitHub user profile data
