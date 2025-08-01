@@ -32,7 +32,9 @@ export default function RootLayout({
                 <div className="container mx-auto px-4">
                   <div className="flex flex-col md:flex-row justify-between items-center">
                     <div className="flex items-center mb-4 md:mb-0">
-                      <span className="text-primary font-semibold text-xl">SourceSeekr</span>
+                      <span className="text-primary font-semibold text-xl">
+                        SourceSeekr
+                      </span>
                     </div>
                     <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-8 text-center md:text-left">
                       <div>
@@ -47,15 +49,39 @@ export default function RootLayout({
                       <div>
                         <h3 className="font-medium mb-2">Links</h3>
                         <ul className="space-y-1 text-muted-foreground">
-                          <li><a href="/about" className="hover:text-primary transition-colors">About</a></li>
-                          <li><a href="/explore" className="hover:text-primary transition-colors">Explore</a></li>
-                          <li><a href="/saved" className="hover:text-primary transition-colors">Saved</a></li>
+                          <li>
+                            <a
+                              href="/about"
+                              className="hover:text-primary transition-colors"
+                            >
+                              About
+                            </a>
+                          </li>
+                          <li>
+                            <a
+                              href="/explore"
+                              className="hover:text-primary transition-colors"
+                            >
+                              Explore
+                            </a>
+                          </li>
+                          <li>
+                            <a
+                              href="/saved"
+                              className="hover:text-primary transition-colors"
+                            >
+                              Saved
+                            </a>
+                          </li>
                         </ul>
                       </div>
                     </div>
                   </div>
                   <div className="mt-8 pt-8 border-t border-border text-center text-muted-foreground text-sm">
-                    <p>© {new Date().getFullYear()} SourceSeekr. All rights reserved.</p>
+                    <p>
+                      © {new Date().getFullYear()} SourceSeekr. All rights
+                      reserved..
+                    </p>
                   </div>
                 </div>
               </footer>
