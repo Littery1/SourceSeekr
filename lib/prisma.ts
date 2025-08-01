@@ -8,7 +8,6 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
-// This uses the official Vercel variable for the POOLED connection.
 const neon = new Pool({ connectionString: process.env.POSTGRES_PRISMA_URL! });
 const adapter = new PrismaNeon(neon);
 
