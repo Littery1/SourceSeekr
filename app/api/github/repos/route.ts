@@ -5,7 +5,7 @@ console.log(
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import * as githubAPI from "@/lib/github-api";
-import prisma from "@/prisma/prisma"; // Import the Prisma client
+import prisma from "@/prisma/client"; // Import the Prisma client
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +33,9 @@ async function getToken() {
     console.log("✅ Using app's GITHUB_TOKEN for GitHub API.");
   } else {
     // This is the error condition. If you see this, your .env.local is wrong.
-    console.error("❌ CRITICAL: GITHUB_TOKEN is not loaded from .env.local file.");
+    console.error(
+      "❌ CRITICAL: GITHUB_TOKEN is not loaded from .env.local file."
+    );
   }
   return appToken || null;
 }

@@ -3,7 +3,7 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import prisma from "./prisma/edge"; // <-- Use the serverless-safe client
+import prisma from "./prisma/client"; // <-- Use the serverless-safe client
 
 const GITHUB_CLIENT_ID = process.env.AUTH_GITHUB_ID;
 const GITHUB_CLIENT_SECRET = process.env.AUTH_GITHUB_SECRET;
