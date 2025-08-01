@@ -995,9 +995,9 @@
         throw new GitHubAuthError("GitHub token is required for GraphQL API");
       }
       
-      const query = `
-        query {
-          repository(owner: "${owner}", name: "${name}") {
+           const query = `
+        query RepositoryData($owner: String!, $name: String!) {
+          repository(owner: $owner, name: $name) {
             id
             name
             description
@@ -1021,13 +1021,10 @@
               login
               avatarUrl
             }
-            mentionableUsers(first: 10) {
+            collaborators(first: 10, affiliation: DIRECT) {
               nodes {
                 login
                 avatarUrl
-                contributionsCollection(repositoryId: $repoId: "${owner}/${name}") {
-                  contributionCount
-                }
               }
             }
             repositoryTopics(first: 20) {
@@ -1063,9 +1060,12 @@
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
             "User-Agent": "SourceSeekr-App",
-            "X-GitHub-Api-Version": "2022-11-28"
+            "X-GitHub-Api-Version": "2022-11-28",
           },
-          body: JSON.stringify({ query }),
+          body: JSON.stringify({
+            query,
+            variables: { owner, name },
+          }),
         });
         
         // Handle potential API errors
@@ -1143,19 +1143,22 @@
             forks: formatNumber(graphqlData.forkCount),
             pullRequests: formatNumber(graphqlData.pullRequests.totalCount),
             issuesCount: formatNumber(graphqlData.openIssues.totalCount),
-            issues: graphqlData.openIssues.nodes.map((issue: any) => issue.title),
+            issues: graphqlData.openIssues.nodes.map(
+              (issue: any) => issue.title
+            ),
             language: graphqlData.primaryLanguage?.name || null,
             ownerAvatar: graphqlData.owner.avatarUrl,
             owner: graphqlData.owner.login,
-            contributors: graphqlData.mentionableUsers.nodes
-              .filter((user: any) => user.contributionsCollection?.contributionCount > 0)
-              .map((user: any) => ({
+            contributors: (graphqlData.collaborators?.nodes || []).map(
+              (user: any) => ({
                 login: user.login,
                 avatar_url: user.avatarUrl,
-                contributions: user.contributionsCollection?.contributionCount || 0
-              }))
-              .sort((a: any, b: any) => b.contributions - a.contributions),
-            topics: graphqlData.repositoryTopics.nodes.map((topic: any) => topic.topic.name),
+                contributions: 1, // Placeholder contribution count
+              })
+            ),
+            topics: graphqlData.repositoryTopics.nodes.map(
+              (topic: any) => topic.topic.name
+            ),
             homepage: graphqlData.homepageUrl || null,
             createdAt: graphqlData.createdAt,
             updatedAt: graphqlData.updatedAt,
