@@ -1,7 +1,8 @@
-import NextAuth from "next-auth";
-import { authConfig } from "./auth.config"; // Import the base config
-import prisma from "./lib/prisma";
-import { Profile } from "next-auth";
+// auth.ts
+
+import NextAuth, { Profile } from "next-auth";
+import GitHub from "next-auth/providers/github";
+import prisma from "@/lib/prisma"; // Using our unified, serverless-safe client
 
 interface GitHubProfile extends Profile {
   login?: string;
@@ -9,13 +10,22 @@ interface GitHubProfile extends Profile {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  ...authConfig, // Spread the base, Edge-safe config
+  providers: [
+    GitHub({
+      clientId: process.env.AUTH_GITHUB_ID,
+      clientSecret: process.env.AUTH_GITHUB_SECRET,
+    }),
+  ],
+  session: {
+    strategy: "jwt",
+  },
+  secret: process.env.AUTH_SECRET,
+  trustHost: true, // This is crucial for Vercel deployments
+  pages: {
+    signIn: "/login",
+  },
   callbacks: {
-    // We keep the 'authorized' callback from the config for consistency,
-    // but it's primarily used by the middleware.
-    ...authConfig.callbacks,
-
-    // This signIn callback ONLY runs on the Node.js runtime via the API route.
+    // The `signIn` callback runs on the Node.js runtime after a successful provider sign-in
     async signIn({ user, account, profile }) {
       if (!account || !profile?.email) return false;
       try {
@@ -67,18 +77,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return true;
       } catch (error) {
         console.error("Auth.js signIn callback error:", error);
-        return false;
+        return false; // Return false to deny access
       }
     },
-    async jwt({ token, user, account }) {
-      if (account && user) {
-        // This is a database call, so it must only run in the Node.js runtime.
-        const dbUser = await prisma.user.findUnique({
-          where: { email: user.email! },
-        });
-        if (dbUser) {
-          token.id = dbUser.id;
-        }
+    // JWT and Session callbacks enhance the token and session object
+    async jwt({ token, user }) {
+      if (user?.id) {
+        token.id = user.id;
       }
       return token;
     },
@@ -89,4 +94,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session;
     },
   },
-});
+}); 
