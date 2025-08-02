@@ -1,8 +1,6 @@
 import { handlers } from "@/auth";
 export const { GET, POST } = handlers;
 
-// This is crucial for Vercel Hobby plan to prevent timeouts
-export const maxDuration = 60;
-
+export const runtime = "nodejs"; // Force Node.js runtime for this route
+export const maxDuration = 60; // Increase timeout for cold starts + DB operations
 export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
