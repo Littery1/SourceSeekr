@@ -1,8 +1,9 @@
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
+import { authConfig } from "./auth.config"; // <-- IMPORTANT: Import from the Edge-safe config ONLY
 
-export default auth;
+export default NextAuth(authConfig).auth;
 
 export const config = {
-  // This matcher protects all routes except for static assets and images.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|images).*)"],
+  // Match all paths except for static files, images, and the NextAuth API routes themselves.
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|images).*)"],
 };

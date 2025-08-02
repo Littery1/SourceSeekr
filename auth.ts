@@ -1,14 +1,9 @@
-// auth.ts
-
 import NextAuth, { Profile } from "next-auth";
 import GitHub from "next-auth/providers/github";
-import prisma from "@/lib/prisma"; // Using our unified, serverless-safe client
+import prisma from "@/lib/prisma";
 
-interface GitHubProfile extends Profile {
-  login?: string;
-  avatar_url?: string;
-}
-
+// This is the main configuration used by your API routes.
+// It includes database interactions.
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     GitHub({
@@ -20,31 +15,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     strategy: "jwt",
   },
   secret: process.env.AUTH_SECRET,
-  trustHost: true, // This is crucial for Vercel deployments
+  trustHost: true,
   pages: {
     signIn: "/login",
   },
   callbacks: {
-    // The `signIn` callback runs on the Node.js runtime after a successful provider sign-in
+    // This signIn callback uses Prisma and will only run in the Node.js runtime.
     async signIn({ user, account, profile }) {
-      if (!account || !profile?.email) return false;
+      if (!account || !profile?.email) {
+        return false; // Deny access if essential info is missing
+      }
       try {
-        const githubProfile = profile as GitHubProfile;
-        const userImage =
-          (typeof profile.image === "string"
-            ? profile.image
-            : githubProfile.avatar_url) || null;
+        const githubProfile = profile as Profile & {
+          login?: string;
+          avatar_url?: string;
+        };
+        const userImage = githubProfile.avatar_url || user.image || null;
 
         const dbUser = await prisma.user.upsert({
           where: { email: profile.email },
           update: {
-            name: profile.name ?? githubProfile.login ?? "GitHub User",
+            name: user.name ?? githubProfile.login,
             image: userImage,
           },
           create: {
             id: user.id,
             email: profile.email,
-            name: profile.name ?? githubProfile.login ?? "GitHub User",
+            name: user.name ?? githubProfile.login,
             image: userImage,
           },
         });
@@ -74,15 +71,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             id_token: account.id_token,
           },
         });
-        return true;
+        return true; // Allow sign-in
       } catch (error) {
-        console.error("Auth.js signIn callback error:", error);
-        return false; // Return false to deny access
+        console.error("Auth.js signIn callback database error:", error);
+        return false; // Deny access on database error
       }
     },
-    // JWT and Session callbacks enhance the token and session object
+    // These callbacks add the database user ID to the token and session.
     async jwt({ token, user }) {
-      if (user?.id) {
+      if (user) {
         token.id = user.id;
       }
       return token;
@@ -94,4 +91,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session;
     },
   },
-}); 
+});
