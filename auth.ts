@@ -11,9 +11,11 @@ interface GitHubProfile extends Profile {
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig, // Spread the base, Edge-safe config
   callbacks: {
-    ...authConfig.callbacks, // Include the authorized callback for completeness
-    // This is your original signIn callback that uses Prisma.
-    // It will only be used by the server-side API routes, not the middleware.
+    // We keep the 'authorized' callback from the config for consistency,
+    // but it's primarily used by the middleware.
+    ...authConfig.callbacks,
+
+    // This signIn callback ONLY runs on the Node.js runtime via the API route.
     async signIn({ user, account, profile }) {
       if (!account || !profile?.email) return false;
       try {
@@ -70,15 +72,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async jwt({ token, user, account }) {
       if (account && user) {
-        const dbUser = await prisma.user.findFirst({
-          where: {
-            accounts: {
-              some: {
-                provider: account.provider,
-                providerAccountId: account.providerAccountId,
-              },
-            },
-          },
+        // This is a database call, so it must only run in the Node.js runtime.
+        const dbUser = await prisma.user.findUnique({
+          where: { email: user.email! },
         });
         if (dbUser) {
           token.id = dbUser.id;
@@ -87,7 +83,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
+      if (session.user && token.id) {
         session.user.id = token.id as string;
       }
       return session;

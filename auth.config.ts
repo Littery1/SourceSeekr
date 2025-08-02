@@ -1,7 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import GitHub from "next-auth/providers/github";
 
-// Notice that this is a partial object, missing the database-related callbacks
 export const authConfig = {
   providers: [
     GitHub({
@@ -18,21 +17,35 @@ export const authConfig = {
   secret: process.env.AUTH_SECRET,
   trustHost: true,
   callbacks: {
-    // This authorized callback is for the middleware.
-    // It's called before the database-heavy signIn callback.
+    // This authorized callback runs in the middleware on the Edge.
+    // It should NOT contain any database logic.
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const protectedRoutes = ["/dashboard", "/profile", "/saved", "/chat"];
+      const authRoutes = ["/login", "/register"];
+
       const isProtectedRoute = protectedRoutes.some((path) =>
+        nextUrl.pathname.startsWith(path)
+      );
+      const isAuthRoute = authRoutes.some((path) =>
         nextUrl.pathname.startsWith(path)
       );
 
       if (isProtectedRoute && !isLoggedIn) {
-        const loginUrl = new URL("/login", nextUrl.origin);
-        loginUrl.searchParams.set("callbackUrl", nextUrl.href);
-        return Response.redirect(loginUrl);
+        // Redirect unauthenticated users to the login page.
+        return Response.redirect(
+          new URL(`/login?callbackUrl=${nextUrl.href}`, nextUrl.origin)
+        );
       }
-      return true;
+
+      if (isAuthRoute && isLoggedIn) {
+        // Redirect authenticated users away from login/register pages.
+        return Response.redirect(new URL("/dashboard", nextUrl.origin));
+      }
+
+      return true; // Allow the request to proceed.
     },
+    // We only need JWT and Session callbacks in the main auth.ts for the Node.js runtime
+    // to add the user ID to the session token.
   },
 } satisfies NextAuthConfig;
