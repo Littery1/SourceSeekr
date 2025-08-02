@@ -1,9 +1,14 @@
+// auth.ts
+
 import NextAuth, { Profile } from "next-auth";
 import GitHub from "next-auth/providers/github";
 import prisma from "@/lib/prisma";
 
-// This is the main configuration used by your API routes.
-// It includes database interactions.
+interface GitHubProfile extends Profile {
+  login?: string;
+  avatar_url?: string;
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     GitHub({
@@ -20,28 +25,40 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    // This signIn callback uses Prisma and will only run in the Node.js runtime.
+    // Replace your old signIn callback with this one
     async signIn({ user, account, profile }) {
       if (!account || !profile?.email) {
-        return false; // Deny access if essential info is missing
+        console.error("SignIn aborted: account or profile email is missing.");
+        return false;
       }
       try {
-        const githubProfile = profile as Profile & {
-          login?: string;
-          avatar_url?: string;
-        };
+        const githubProfile = profile as GitHubProfile;
         const userImage = githubProfile.avatar_url || user.image || null;
+
+        // --- THIS IS THE FIX ---
+        // Establish a guaranteed string for the name.
+        // Preference: GitHub display name > GitHub username (login)
+        const finalName = profile.name || githubProfile.login;
+
+        // If for some reason a name cannot be determined, deny sign-in.
+        if (!finalName) {
+          console.error(
+            "SignIn failed: Could not determine user's name from GitHub profile."
+          );
+          return false;
+        }
+        // -----------------------
 
         const dbUser = await prisma.user.upsert({
           where: { email: profile.email },
           update: {
-            name: user.name ?? githubProfile.login,
+            name: finalName, // Use the guaranteed string value
             image: userImage,
           },
           create: {
-            id: user.id,
+            id: user.id!, // user.id is present at this stage
             email: profile.email,
-            name: user.name ?? githubProfile.login,
+            name: finalName, // Use the guaranteed string value
             image: userImage,
           },
         });
@@ -77,7 +94,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return false; // Deny access on database error
       }
     },
-    // These callbacks add the database user ID to the token and session.
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
