@@ -1,7 +1,6 @@
 import NextAuth, { Profile } from "next-auth";
 import GitHub from "next-auth/providers/github";
 import prisma from "@/lib/prisma";
-import { authConfig } from "./auth.config"; // Import the base config
 
 interface GitHubProfile extends Profile {
   login?: string;
@@ -9,9 +8,7 @@ interface GitHubProfile extends Profile {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  ...authConfig, // Spread the base, Edge-safe config
   providers: [
-    // Add providers here for the API routes to use
     GitHub({
       clientId: process.env.AUTH_GITHUB_ID,
       clientSecret: process.env.AUTH_GITHUB_SECRET,
@@ -22,10 +19,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   secret: process.env.AUTH_SECRET,
   trustHost: true,
+  pages: {
+    signIn: "/login",
+  },
   callbacks: {
-    ...authConfig.callbacks, // Keep the authorized callback from the base config
-
-    // This signIn callback uses Prisma and will ONLY run in the Node.js runtime.
     async signIn({ user, account, profile }) {
       if (!account || !profile?.email) return false;
       try {
@@ -37,10 +34,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const dbUser = await prisma.user.upsert({
           where: { email: profile.email },
-          update: {
-            name: finalName,
-            image: userImage,
-          },
+          update: { name: finalName, image: userImage },
           create: {
             id: user.id!,
             email: profile.email,
@@ -81,15 +75,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
     },
     async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-      }
+      if (user) token.id = user.id;
       return token;
     },
     async session({ session, token }) {
-      if (session.user && token.id) {
-        session.user.id = token.id as string;
-      }
+      if (session.user && token.id) session.user.id = token.id as string;
       return session;
     },
   },
