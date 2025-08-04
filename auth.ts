@@ -3,7 +3,7 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import prisma from "@/lib/prisma"; // This now imports our single, correct client
+import prisma from "@/lib/prisma"; // Using our single, correct client
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -14,7 +14,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   session: {
-    strategy: "database", // This must be "database" when using an adapter
+    strategy: "database", // This MUST be "database" when using an adapter
   },
   secret: process.env.AUTH_SECRET,
   trustHost: true,
