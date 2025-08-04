@@ -1,18 +1,18 @@
 // lib/prisma.ts
 
 import { PrismaClient } from "@prisma/client";
-import { PrismaNeon } from "@prisma/adapter-neon";
-import { Pool } from "@neondatabase/serverless";
+import { withAccelerate } from "@prisma/extension-accelerate";
+
+// This is a corrected type declaration for the global prisma instance
+const prismaClientSingleton = () => {
+  return new PrismaClient().$extends(withAccelerate());
+};
 
 declare global {
-  var prisma: PrismaClient | undefined;
+  var prisma: undefined | ReturnType<typeof prismaClientSingleton>;
 }
 
-// This uses the OFFICIAL Vercel variable for the pooled connection.
-const neon = new Pool({ connectionString: process.env.POSTGRES_PRISMA_URL! });
-const adapter = new PrismaNeon(neon);
-
-const prisma = globalThis.prisma || new PrismaClient({ adapter });
+const prisma = globalThis.prisma ?? prismaClientSingleton();
 
 if (process.env.NODE_ENV !== "production") {
   globalThis.prisma = prisma;

@@ -1,7 +1,9 @@
 // @/lib/repository-service.ts
+import { PrismaClient } from "@prisma/client"; // <-- CRITICAL CHANGE: Use the standard client here.
 import { ProcessedRepo } from "./github-api";
-import prisma from "@/lib/prisma"; // <--- THIS IS THE FIX: Use the central, serverless-safe client.
-// const prisma = new PrismaClient(); // <-- THIS INCORRECT LINE IS NOW DELETED.
+
+// Create a standard Prisma client instance for use ONLY within this service file.
+const prisma = new PrismaClient();
 
 export interface RepoFilter {
   language?: string;
@@ -56,8 +58,6 @@ export async function storeRepository(repo: ProcessedRepo): Promise<void> {
   });
 }
 
-// ... The rest of this file can remain exactly as it was ...
-// (I am omitting it here for brevity, but you can leave it)
 /**
  * Store multiple repositories in the database
  */
@@ -216,7 +216,7 @@ export async function getAvailableLanguages(): Promise<string[]> {
   });
 
   return results
-    .map((result) => result.language)
+    .map((result: { language: string | null }) => result.language)
     .filter((lang): lang is string => lang !== null);
 }
 
@@ -240,7 +240,7 @@ export async function fetchRepositories(
       throw new GitHubRateLimitError();
     }
 
-    const repos = await fetchQualityRepos(page, token);
+    const repos = await fetchQualityRepos(page, "", false, token);
 
     const processedRepos = await processRepositoriesData(repos, {
       userToken: token,
@@ -266,8 +266,8 @@ export async function getTopTopics(
 
   const topicCounts: Record<string, number> = {};
 
-  repos.forEach((repo) => {
-    repo.topics.forEach((topic) => {
+  repos.forEach((repo: { topics: string[] }) => {
+    repo.topics.forEach((topic: string) => {
       topicCounts[topic] = (topicCounts[topic] || 0) + 1;
     });
   });

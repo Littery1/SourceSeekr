@@ -4,15 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate --no-engine && next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^0.9.4",
-    "@prisma/adapter-neon": "5.14.0",
     "@prisma/client": "5.14.0",
+    "@prisma/extension-accelerate": "^2.0.2",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.5",
     "framer-motion": "^11.3.19",

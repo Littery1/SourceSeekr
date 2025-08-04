@@ -9,11 +9,9 @@ generator client {
 
 
 datasource db {
-  provider  = "postgresql"
-  // For the live app, use the official Vercel pooled URL
-  url       = env("POSTGRES_PRISMA_URL")
-  // For migrations during build, use the official Vercel direct URL
-  directUrl = env("POSTGRES_URL_NON_POOLING")
+  provider = "postgresql"
+  // This will use the URL provided by the Vercel integration
+  url      = env("DATABASE_URL")
 }
 model User {
   id                String            @id @default(uuid())
