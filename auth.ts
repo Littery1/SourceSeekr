@@ -1,21 +1,10 @@
 // auth.ts
 
-import NextAuth, { Profile } from "next-auth";
+import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
-import prisma from "@/lib/prisma"; // Using our unified, serverless-safe client
-
-// Define a more specific type for the GitHub profile to ensure properties exist
-interface GitHubProfile extends Profile {
-  login: string;
-  avatar_url: string;
-  name: string;
-  email: string;
-}
+import prisma from "@/lib/prisma"; // This imports the Accelerate-enabled client
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  // The adapter is now completely removed.
-  // adapter: PrismaAdapter(prisma), // <--- THIS LINE IS GONE
-
   providers: [
     GitHub({
       clientId: process.env.AUTH_GITHUB_ID,
@@ -23,7 +12,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   session: {
-    // We MUST use "jwt" for the session strategy when there is no database adapter.
     strategy: "jwt",
   },
   secret: process.env.AUTH_SECRET,
@@ -32,32 +20,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    // This callback now contains the logic that the adapter was failing to execute.
     async signIn({ user, account, profile }) {
       if (account?.provider !== "github" || !profile?.email) {
         return false;
       }
 
-      const githubProfile = profile as GitHubProfile;
-
       try {
-        // Find or create the user in our database
+        // Provide safe fallbacks for potentially null/undefined values from the profile
+        const userName =
+          profile.name ?? (profile as any).login ?? "GitHub User";
+        const userImage = profile.image ?? (profile as any).avatar_url ?? null;
+
         const dbUser = await prisma.user.upsert({
-          where: { email: githubProfile.email },
+          where: { email: profile.email },
           update: {
-            name: githubProfile.name,
-            image: githubProfile.avatar_url,
+            name: userName,
+            image: userImage,
           },
           create: {
-            // Use the provider's ID for the user if you want, or let Prisma generate one
-            id: user.id,
-            email: githubProfile.email,
-            name: githubProfile.name,
-            image: githubProfile.avatar_url,
+            id: user.id!,
+            email: profile.email,
+            name: userName,
+            image: userImage,
           },
         });
 
-        // Find or create the account link
         await prisma.account.upsert({
           where: {
             provider_providerAccountId: {
@@ -72,7 +59,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           },
           create: {
             userId: dbUser.id,
-            type: account.type,
+            type: account.type!,
             provider: account.provider,
             providerAccountId: account.providerAccountId,
             access_token: account.access_token,
@@ -80,30 +67,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             expires_at: account.expires_at,
           },
         });
-
-        return true; // Allow the sign-in
+        return true;
       } catch (error) {
-        console.error("Error during signIn callback:", error);
-        return false; // Prevent sign-in on database error
+        console.error("Auth.js signIn callback error:", error);
+        return false;
       }
     },
-
-    // The JWT callback saves our database user ID into the token
-    async jwt({ token, account, profile }) {
-      if (account && profile) {
-        const userInDb = await prisma.user.findUnique({
-          where: { email: profile.email! },
-        });
-        if (userInDb) {
-          token.id = userInDb.id; // Add our internal user ID to the token
-        }
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
       }
       return token;
     },
-
-    // The session callback adds our internal user ID from the token to the client-side session object
     async session({ session, token }) {
-      if (session.user) {
+      if (session.user && token.id) {
         session.user.id = token.id as string;
       }
       return session;

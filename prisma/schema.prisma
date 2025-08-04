@@ -2,18 +2,18 @@
 // learn more about it in the docs: https://pris.lyly/d/prisma-schema
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
+  // This is needed for Accelerate to work correctly
+  output   = "@prisma/client/edge"
 }
-
 
 datasource db {
   provider  = "postgresql"
-  // For the live app, use the official Vercel pooled URL
+  // These are the official Vercel variables
   url       = env("POSTGRES_PRISMA_URL")
-  // For migrations during build, use the official Vercel direct URL
   directUrl = env("POSTGRES_URL_NON_POOLING")
 }
+
 model User {
   id                String            @id @default(uuid())
   name              String
