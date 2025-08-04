@@ -3,10 +3,7 @@
 
 generator client {
   provider        = "prisma-client-js"
-  // This line is the same
-  output          = "@prisma/client/edge"
-  // THIS IS THE NEW, CRITICAL LINE
-  engineType      = "binary"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
