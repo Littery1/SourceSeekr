@@ -3,37 +3,42 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { Pool } from "@neondatabase/serverless";
 
+// Declare a global type for the PrismaClient instance attached to globalThis
+// This helps with Next.js hot reloading in development
 declare global {
   var prisma: PrismaClient | undefined;
 }
 
-// Ensure the environment variable exists
-const unpooledUrl = process.env.MY_DATABASE_URL_NON_POOLING;
-if (!unpooledUrl) {
-  throw new Error("Missing MY_DATABASE_URL_NON_POOLING environment variable");
-}
+let prisma: PrismaClient;
 
-// Manually construct the pooled URL
-const pooledUrl = `${unpooledUrl}&pgbouncer=true`;
+if (process.env.NODE_ENV === "production") {
+  // In production, always create a new Prisma Client instance
+  // Use the unpooled connection string for serverless functions
+  const unpooledUrl = process.env.MY_DATABASE_URL_NON_POOLING;
 
-// Create the connection pool and adapter
-const pool = new Pool({ connectionString: pooledUrl });
-const adapter = new PrismaNeon(pool);
+  if (!unpooledUrl) {
+    throw new Error("Missing MY_DATABASE_URL_NON_POOLING environment variable");
+  }
 
-// Create Prisma Client with the Neon adapter
-const prisma =
-  global.prisma ||
-  new PrismaClient({
-    adapter,
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
-  });
+  const adapter = new PrismaNeon(new Pool({ connectionString: unpooledUrl }));
+  prisma = new PrismaClient({ adapter });
+} else {
+  // In development, use a global variable to prevent multiple instances
+  // This is also helpful for serverless environments in development
+  if (!global.prisma) {
+    // Use the unpooled connection string for serverless functions
+    const unpooledUrl = process.env.MY_DATABASE_URL_NON_POOLING;
 
-// Prevent multiple instances in development
-if (process.env.NODE_ENV !== "production") {
-  global.prisma = prisma;
+    if (!unpooledUrl) {
+      throw new Error(
+        "Missing MY_DATABASE_URL_NON_POOLING environment variable"
+      );
+    }
+
+    const adapter = new PrismaNeon(new Pool({ connectionString: unpooledUrl }));
+    global.prisma = new PrismaClient({ adapter });
+  }
+  prisma = global.prisma;
 }
 
 export default prisma;

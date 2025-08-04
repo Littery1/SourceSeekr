@@ -1,39 +1,47 @@
-// auth.ts
+// auth.ts (or wherever you configure NextAuth)
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import prisma from "@/lib/prisma"; // Adjust path if needed
 
-// Environment variable validation with explicit typing
-const AUTH_GITHUB_ID = process.env.AUTH_GITHUB_ID;
-const AUTH_GITHUB_SECRET = process.env.AUTH_GITHUB_SECRET;
-const AUTH_SECRET = process.env.AUTH_SECRET;
+// Ensure environment variables are present
+const githubId = process.env.AUTH_GITHUB_ID;
+const githubSecret = process.env.AUTH_GITHUB_SECRET;
+const authSecret = process.env.AUTH_SECRET;
 
-if (!AUTH_GITHUB_ID) {
+if (!githubId) {
   throw new Error("Missing AUTH_GITHUB_ID environment variable");
 }
-
-if (!AUTH_GITHUB_SECRET) {
+if (!githubSecret) {
   throw new Error("Missing AUTH_GITHUB_SECRET environment variable");
 }
-
-if (!AUTH_SECRET) {
+if (!authSecret) {
   throw new Error("Missing AUTH_SECRET environment variable");
 }
 
-// Correct NextAuth v5 Beta configuration with explicit typing
-const { handlers, auth, signIn, signOut } = NextAuth({
+export const {
+  handlers: { GET, POST },
+  auth,
+  signIn,
+  signOut,
+} = NextAuth({
+  // Use the Prisma adapter for database interactions
+  adapter: PrismaAdapter(prisma),
+  // Configure the GitHub provider
   providers: [
     GitHub({
-      clientId: AUTH_GITHUB_ID,
-      clientSecret: AUTH_GITHUB_SECRET,
+      clientId: githubId,
+      clientSecret: githubSecret,
     }),
   ],
-  secret: AUTH_SECRET,
-  // Use JWT for session handling (no database required for this test)
+  // Explicitly use JWT strategy for sessions (can be helpful for debugging)
   session: {
     strategy: "jwt",
   },
+  // Secret used to encrypt the NextAuth.js cookie
+  secret: authSecret,
+  // Trust the host header from Vercel/Cloudflare/etc.
+  trustHost: true,
+  // Remove ALL other options: callbacks, pages, events, etc. for minimal testing
+  // Ensure AUTH_URL is set correctly in Vercel env vars for Production only
 });
-
-// Explicit exports for App Router
-export { handlers, auth, signIn, signOut };
-export const { GET, POST } = handlers;
