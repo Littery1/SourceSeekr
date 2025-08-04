@@ -7,12 +7,13 @@ generator client {
 }
 
 
+
 datasource db {
   provider  = "postgresql"
-  // Use our new custom variable for the pooled URL
-  url       = env("MY_DATABASE_URL_POOLING") 
-  // Use our new custom variable for the direct URL
-  directUrl = env("MY_DATABASE_URL_NON_POOLING")
+  // For the live app, use the official Vercel pooled URL
+  url       = env("POSTGRES_PRISMA_URL")
+  // For migrations during build, use the official Vercel direct URL
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 model User {
   id                String            @id @default(uuid())
