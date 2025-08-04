@@ -2,17 +2,19 @@
 // learn more about it in the docs: https://pris.lyly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
-  // This is needed for Accelerate to work correctly
-  output   = "@prisma/client/edge"
+  provider        = "prisma-client-js"
+  // This line is the same
+  output          = "@prisma/client/edge"
+  // THIS IS THE NEW, CRITICAL LINE
+  engineType      = "binary"
 }
 
 datasource db {
   provider  = "postgresql"
-  // These are the official Vercel variables
   url       = env("POSTGRES_PRISMA_URL")
   directUrl = env("POSTGRES_URL_NON_POOLING")
 }
+
 
 model User {
   id                String            @id @default(uuid())
