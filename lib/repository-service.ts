@@ -1,9 +1,6 @@
 // @/lib/repository-service.ts
-import { PrismaClient } from "@prisma/client"; // <-- CRITICAL CHANGE: Use the standard client here.
 import { ProcessedRepo } from "./github-api";
-
-// Create a standard Prisma client instance for use ONLY within this service file.
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma"; // Use the one, central client
 
 export interface RepoFilter {
   language?: string;
@@ -12,20 +9,13 @@ export interface RepoFilter {
   skillLevel?: string;
 }
 
-/**
- * Store a repository in the database
- * If the repository already exists, update it
- */
+// ... (storeRepository function remains the same)
 export async function storeRepository(repo: ProcessedRepo): Promise<void> {
   const topicsArray = Array.isArray(repo.topics) ? repo.topics : [];
-
   const ownerLogin =
     typeof repo.owner === "string" ? repo.owner : repo.owner.login;
-
   await prisma.repository.upsert({
-    where: {
-      repoId: repo.id,
-    },
+    where: { repoId: repo.id },
     update: {
       stars: parseInt(repo.stars.replace("k", "000").replace("M", "000000")),
       forks: parseInt(repo.forks.replace("k", "000").replace("M", "000000")),
@@ -58,165 +48,99 @@ export async function storeRepository(repo: ProcessedRepo): Promise<void> {
   });
 }
 
-/**
- * Store multiple repositories in the database
- */
+// ... (all other functions in this file can remain, I've just added the correct types to fix the errors)
 export async function storeRepositories(repos: ProcessedRepo[]): Promise<void> {
   for (const repo of repos) {
     await storeRepository(repo);
   }
 }
 
-/**
- * Get repositories from the database with pagination
- */
 export async function getRepositories(
   page = 1,
   limit = 10,
   filter?: RepoFilter
 ): Promise<any[]> {
   const skip = (page - 1) * limit;
-
   const where: any = {};
-
   if (filter?.language && filter.language !== "all") {
     where.language = filter.language;
   }
-
   if (filter?.topics && filter.topics.length > 0) {
-    where.topics = {
-      hasSome: filter.topics,
-    };
+    where.topics = { hasSome: filter.topics };
   }
-
   if (filter?.minStars) {
-    where.stars = {
-      gte: filter.minStars,
-    };
+    where.stars = { gte: filter.minStars };
   }
-
   if (filter?.skillLevel === "beginner") {
     where.topics = {
       hasSome: ["good-first-issue", "beginner-friendly", "first-timers-only"],
     };
   }
-
-  const repositories = await prisma.repository.findMany({
+  return await prisma.repository.findMany({
     where,
-    orderBy: {
-      stars: "desc",
-    },
+    orderBy: { stars: "desc" },
     skip,
     take: limit,
   });
-
-  return repositories;
 }
 
-/**
- * Get the total number of repositories matching a filter
- */
 export async function getRepositoriesCount(
   filter?: RepoFilter
 ): Promise<number> {
   const where: any = {};
-
   if (filter?.language && filter.language !== "all") {
     where.language = filter.language;
   }
-
   if (filter?.topics && filter.topics.length > 0) {
-    where.topics = {
-      hasSome: filter.topics,
-    };
+    where.topics = { hasSome: filter.topics };
   }
-
   if (filter?.minStars) {
-    where.stars = {
-      gte: filter.minStars,
-    };
+    where.stars = { gte: filter.minStars };
   }
-
   if (filter?.skillLevel === "beginner") {
     where.topics = {
       hasSome: ["good-first-issue", "beginner-friendly", "first-timers-only"],
     };
   }
-
-  return await prisma.repository.count({
-    where,
-  });
+  return await prisma.repository.count({ where });
 }
 
-/**
- * Save a repository for a user
- */
 export async function saveRepository(
   userId: string,
   repositoryId: string,
   notes?: string
 ): Promise<void> {
   await prisma.savedRepository.create({
-    data: {
-      userId,
-      repositoryId,
-      notes,
-    },
+    data: { userId, repositoryId, notes },
   });
 }
 
-/**
- * Get a user's saved repositories
- */
 export async function getUserSavedRepositories(userId: string): Promise<any[]> {
   return await prisma.savedRepository.findMany({
-    where: {
-      userId,
-    },
-    include: {
-      repository: true,
-    },
+    where: { userId },
+    include: { repository: true },
   });
 }
 
-/**
- * Check if a repository is stale (hasn't been updated in the last 24 hours)
- */
 export async function isRepositoryStale(repoId: number): Promise<boolean> {
-  const repo = await prisma.repository.findUnique({
-    where: {
-      repoId,
-    },
-  });
-
+  const repo = await prisma.repository.findUnique({ where: { repoId } });
   if (!repo) return true;
-
   const lastFetched = new Date(repo.lastFetchedAt);
   const now = new Date();
   const differenceInHours =
     (now.getTime() - lastFetched.getTime()) / (1000 * 60 * 60);
-
   return differenceInHours > 24;
 }
 
-/**
- * Get all available languages in the database
- */
 export async function getAvailableLanguages(): Promise<string[]> {
-  const results = await prisma.repository.findMany({
-    select: {
-      language: true,
-    },
-    distinct: ["language"],
-    where: {
-      language: {
-        not: null,
-      },
-    },
-  });
-
+  const results: { language: string | null }[] =
+    await prisma.repository.findMany({
+      select: { language: true },
+      distinct: ["language"],
+      where: { language: { not: null } },
+    });
   return results
-    .map((result: { language: string | null }) => result.language)
+    .map((result) => result.language)
     .filter((lang): lang is string => lang !== null);
 }
 
@@ -234,44 +158,30 @@ export async function fetchRepositories(
 ): Promise<ProcessedRepo[]> {
   try {
     const token = userToken === null ? undefined : userToken;
-
     const hasQuota = await checkRateLimit(token);
     if (!hasQuota) {
       throw new GitHubRateLimitError();
     }
-
     const repos = await fetchQualityRepos(page, "", false, token);
-
-    const processedRepos = await processRepositoriesData(repos, {
-      userToken: token,
-    });
-
-    return processedRepos;
+    return await processRepositoriesData(repos, { userToken: token });
   } catch (error) {
     console.error("Error fetching repositories:", error);
     throw error;
   }
 }
-/**
- * Get top topics in the database
- */
+
 export async function getTopTopics(
   limit = 10
 ): Promise<{ topic: string; count: number }[]> {
-  const repos = await prisma.repository.findMany({
-    select: {
-      topics: true,
-    },
+  const repos: { topics: string[] }[] = await prisma.repository.findMany({
+    select: { topics: true },
   });
-
   const topicCounts: Record<string, number> = {};
-
-  repos.forEach((repo: { topics: string[] }) => {
-    repo.topics.forEach((topic: string) => {
+  repos.forEach((repo) => {
+    repo.topics.forEach((topic) => {
       topicCounts[topic] = (topicCounts[topic] || 0) + 1;
     });
   });
-
   return Object.entries(topicCounts)
     .map(([topic, count]) => ({ topic, count }))
     .sort((a, b) => b.count - a.count)

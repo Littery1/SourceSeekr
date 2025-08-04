@@ -1,13 +1,12 @@
-import NextAuth, { Profile } from "next-auth";
-import GitHub from "next-auth/providers/github";
-import prisma from "@/lib/prisma";
+// auth.ts
 
-interface GitHubProfile extends Profile {
-  login?: string;
-  avatar_url?: string;
-}
+import NextAuth from "next-auth";
+import GitHub from "next-auth/providers/github";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import prisma from "@/lib/prisma"; // This now imports our single, correct client
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  adapter: PrismaAdapter(prisma),
   providers: [
     GitHub({
       clientId: process.env.AUTH_GITHUB_ID,
@@ -15,7 +14,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   session: {
-    strategy: "jwt",
+    strategy: "database", // This must be "database" when using an adapter
   },
   secret: process.env.AUTH_SECRET,
   trustHost: true,
@@ -23,63 +22,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    async signIn({ user, account, profile }) {
-      if (!account || !profile?.email) return false;
-      try {
-        const githubProfile = profile as GitHubProfile;
-        const userImage = githubProfile.avatar_url || user.image || null;
-        const finalName = profile.name || githubProfile.login;
-
-        if (!finalName) return false;
-
-        const dbUser = await prisma.user.upsert({
-          where: { email: profile.email },
-          update: { name: finalName, image: userImage },
-          create: {
-            id: user.id!,
-            email: profile.email,
-            name: finalName,
-            image: userImage,
-          },
-        });
-
-        await prisma.account.upsert({
-          where: {
-            provider_providerAccountId: {
-              provider: account.provider,
-              providerAccountId: account.providerAccountId,
-            },
-          },
-          update: {
-            access_token: account.access_token,
-            refresh_token: account.refresh_token,
-            expires_at: account.expires_at,
-          },
-          create: {
-            userId: dbUser.id,
-            type: account.type,
-            provider: account.provider,
-            providerAccountId: account.providerAccountId,
-            access_token: account.access_token,
-            refresh_token: account.refresh_token,
-            expires_at: account.expires_at,
-            token_type: account.token_type,
-            scope: account.scope,
-            id_token: account.id_token,
-          },
-        });
-        return true;
-      } catch (error) {
-        console.error("Auth.js signIn callback database error:", error);
-        return false;
+    async session({ session, user }) {
+      if (session.user && user) {
+        session.user.id = user.id;
       }
-    },
-    async jwt({ token, user }) {
-      if (user) token.id = user.id;
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user && token.id) session.user.id = token.id as string;
       return session;
     },
   },
