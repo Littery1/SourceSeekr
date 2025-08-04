@@ -8,9 +8,9 @@ declare global {
 }
 
 // Ensure the environment variable exists
-const unpooledUrl = process.env.POSTGRES_URL_NON_POOLING;
+const unpooledUrl = process.env.MY_DATABASE_URL_NON_POOLING;
 if (!unpooledUrl) {
-  throw new Error("Missing POSTGRES_URL_NON_POOLING environment variable");
+  throw new Error("Missing MY_DATABASE_URL_NON_POOLING environment variable");
 }
 
 // Manually construct the pooled URL
