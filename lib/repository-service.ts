@@ -1,7 +1,7 @@
 // @/lib/repository-service.ts
+import { PrismaClient } from "@prisma/client";
 import { ProcessedRepo } from "./github-api";
-import prisma from "@/lib/prisma"; // Use the one, central client
-
+import prisma from "@/lib/prisma";
 export interface RepoFilter {
   language?: string;
   topics?: string[];
