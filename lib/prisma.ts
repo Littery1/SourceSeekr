@@ -4,7 +4,7 @@ import { PrismaNeon } from "@prisma/adapter-neon";
 import { Pool } from "@neondatabase/serverless";
 
 // Declare a global type for the PrismaClient instance attached to globalThis
-// This helps with Next.js hot reloading in developments
+// This helps with Next.js hot reloading in developmens
 declare global {
   var prisma: PrismaClient | undefined;
 }
