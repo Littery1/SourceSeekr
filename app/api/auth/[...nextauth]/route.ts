@@ -1,6 +1,6 @@
-import { handlers } from "@/auth";
-export const { GET, POST } = handlers;
+// app/api/auth/[...nextauth]/route.ts
 
-export const runtime = "nodejs"; // Force Node.js runtime for this route
-export const maxDuration = 60; // Increase timeout for cold starts + DB operations
+export { handlers as GET, handlers as POST } from "@/auth";
+
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
