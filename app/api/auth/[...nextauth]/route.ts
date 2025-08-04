@@ -1,11 +1,10 @@
 // app/api/auth/[...nextauth]/route.ts
-import NextAuth from "next-auth";
-import { handlers } from "@/auth"; // Adjusted path based on your structure
+import { GET, POST } from "@/auth"; // Import the handlers directly
 
-// Explicitly export the handlers - this is the correct pattern for v5 Beta
-export const { GET, POST } = handlers;
+// Re-export them for the Next.js route
+export { GET, POST };
 
-// Vercel Route Segment Config
+// Vercel Route Segment Config (keep these if you had them)
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

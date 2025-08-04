@@ -1,10 +1,10 @@
-// auth.ts (in root)
+// auth.ts (in your project root)
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import prisma from "@/lib/prisma";
 
-// Environment variable validation
+// Environment variable validation (good practice)
 if (!process.env.AUTH_GITHUB_ID) {
   throw new Error("Missing AUTH_GITHUB_ID environment variable");
 }
@@ -17,7 +17,13 @@ if (!process.env.AUTH_SECRET) {
   throw new Error("Missing AUTH_SECRET environment variable");
 }
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+// Correct NextAuth v5 Beta configuration and export
+export const {
+  handlers: { GET, POST },
+  auth,
+  signIn,
+  signOut,
+} = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     GitHub({
@@ -26,5 +32,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   secret: process.env.AUTH_SECRET,
-  // Add any other custom options you had before
+  // Add any other options you had before
+  // callbacks: { ... }
 });
