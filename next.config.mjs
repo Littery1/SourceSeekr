@@ -1,5 +1,8 @@
+// next.config.mjs
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Add transpilePackages here
+  transpilePackages: ["next-auth", "@auth/core"],
   images: {
     remotePatterns: [
       {
@@ -42,7 +45,11 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   experimental: {
-    serverComponentsExternalPackages: ["@prisma/client", "@auth/prisma-adapter", "bcryptjs"],
+    serverComponentsExternalPackages: [
+      "@prisma/client",
+      "@auth/prisma-adapter",
+      "bcryptjs",
+    ],
   },
   typescript: {
     // Similarly to ESLint, this is to ignore TypeScript errors during build
