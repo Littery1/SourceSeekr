@@ -1,8 +1,6 @@
 // app/api/auth/[...nextauth]/route.ts
 import { GET, POST } from "@/auth";
 
-console.log("✅ NextAuth route handler loaded");
-
 export { GET, POST };
 
 // Vercel configuration
