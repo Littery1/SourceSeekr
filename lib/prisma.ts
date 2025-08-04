@@ -9,7 +9,9 @@ declare global {
 }
 
 // Point the connection pool to our new custom variable
-const neon = new Pool({ connectionString: process.env.DATABASE_URL_POOLING! });
+const neon = new Pool({
+  connectionString: process.env.MY_DATABASE_URL_POOLING!,
+});
 const adapter = new PrismaNeon(neon);
 
 const prisma = globalThis.prisma || new PrismaClient({ adapter });
