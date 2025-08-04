@@ -4,7 +4,7 @@ import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import prisma from "@/lib/prisma";
 
-// Environment variable validation
+// Validate required environment variables
 if (!process.env.AUTH_GITHUB_ID) {
   throw new Error("Missing AUTH_GITHUB_ID environment variable");
 }
@@ -17,7 +17,7 @@ if (!process.env.AUTH_SECRET) {
   throw new Error("Missing AUTH_SECRET environment variable");
 }
 
-// Correct NextAuth v5 Beta configuration
+// Correct NextAuth v5 Beta configuration and export pattern
 export const {
   handlers: { GET, POST },
   auth,
@@ -32,15 +32,6 @@ export const {
     }),
   ],
   secret: process.env.AUTH_SECRET,
-  // Add any other options you need
+  // Add any other custom options you need here
+  // callbacks: { ... }
 });
-
-// If you have custom session or jwt callbacks, add them here:
-// callbacks: {
-//   session({ session, user }) {
-//     if (session.user) {
-//       session.user.id = user.id;
-//     }
-//     return session;
-//   },
-// }
