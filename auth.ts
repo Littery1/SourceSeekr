@@ -15,7 +15,7 @@ if (!process.env.AUTH_SECRET) {
   throw new Error("Missing AUTH_SECRET environment variable");
 }
 
-// Simplified NextAuth config without database adapter
+// Simplified NextAuth config WITHOUT database adapter
 export const {
   handlers: { GET, POST },
   auth,
