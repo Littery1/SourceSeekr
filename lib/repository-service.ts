@@ -1,8 +1,7 @@
 // @/lib/repository-service.ts
-import { PrismaClient } from '@prisma/client';
-import { ProcessedRepo } from './github-api';
-
-const prisma = new PrismaClient();
+import { ProcessedRepo } from "./github-api";
+import prisma from "@/lib/prisma"; // <--- THIS IS THE FIX: Use the central, serverless-safe client.
+// const prisma = new PrismaClient(); // <-- THIS INCORRECT LINE IS NOW DELETED.
 
 export interface RepoFilter {
   language?: string;
@@ -18,7 +17,6 @@ export interface RepoFilter {
 export async function storeRepository(repo: ProcessedRepo): Promise<void> {
   const topicsArray = Array.isArray(repo.topics) ? repo.topics : [];
 
-  // Helper to safely extract the owner's login string
   const ownerLogin =
     typeof repo.owner === "string" ? repo.owner : repo.owner.login;
 
@@ -38,7 +36,7 @@ export async function storeRepository(repo: ProcessedRepo): Promise<void> {
     },
     create: {
       repoId: repo.id,
-      owner: ownerLogin, // Corrected: Use the extracted string value
+      owner: ownerLogin,
       name: repo.name,
       fullName: repo.fullName,
       description: repo.description || "",
@@ -58,6 +56,8 @@ export async function storeRepository(repo: ProcessedRepo): Promise<void> {
   });
 }
 
+// ... The rest of this file can remain exactly as it was ...
+// (I am omitting it here for brevity, but you can leave it)
 /**
  * Store multiple repositories in the database
  */
@@ -70,77 +70,79 @@ export async function storeRepositories(repos: ProcessedRepo[]): Promise<void> {
 /**
  * Get repositories from the database with pagination
  */
-export async function getRepositories(page = 1, limit = 10, filter?: RepoFilter): Promise<any[]> {
+export async function getRepositories(
+  page = 1,
+  limit = 10,
+  filter?: RepoFilter
+): Promise<any[]> {
   const skip = (page - 1) * limit;
-  
-  // Build the where clause based on filters
+
   const where: any = {};
-  
-  if (filter?.language && filter.language !== 'all') {
+
+  if (filter?.language && filter.language !== "all") {
     where.language = filter.language;
   }
-  
+
   if (filter?.topics && filter.topics.length > 0) {
     where.topics = {
       hasSome: filter.topics,
     };
   }
-  
+
   if (filter?.minStars) {
     where.stars = {
       gte: filter.minStars,
     };
   }
-  
-  // For beginner friendly repos
-  if (filter?.skillLevel === 'beginner') {
+
+  if (filter?.skillLevel === "beginner") {
     where.topics = {
-      hasSome: ['good-first-issue', 'beginner-friendly', 'first-timers-only'],
+      hasSome: ["good-first-issue", "beginner-friendly", "first-timers-only"],
     };
   }
-  
+
   const repositories = await prisma.repository.findMany({
     where,
     orderBy: {
-      stars: 'desc',
+      stars: "desc",
     },
     skip,
     take: limit,
   });
-  
+
   return repositories;
 }
 
 /**
  * Get the total number of repositories matching a filter
  */
-export async function getRepositoriesCount(filter?: RepoFilter): Promise<number> {
-  // Build the where clause based on filters
+export async function getRepositoriesCount(
+  filter?: RepoFilter
+): Promise<number> {
   const where: any = {};
-  
-  if (filter?.language && filter.language !== 'all') {
+
+  if (filter?.language && filter.language !== "all") {
     where.language = filter.language;
   }
-  
+
   if (filter?.topics && filter.topics.length > 0) {
     where.topics = {
       hasSome: filter.topics,
     };
   }
-  
+
   if (filter?.minStars) {
     where.stars = {
       gte: filter.minStars,
     };
   }
-  
-  // For beginner friendly repos
-  if (filter?.skillLevel === 'beginner') {
+
+  if (filter?.skillLevel === "beginner") {
     where.topics = {
-      hasSome: ['good-first-issue', 'beginner-friendly', 'first-timers-only'],
+      hasSome: ["good-first-issue", "beginner-friendly", "first-timers-only"],
     };
   }
-  
+
   return await prisma.repository.count({
     where,
   });
@@ -149,7 +151,11 @@ export async function getRepositoriesCount(filter?: RepoFilter): Promise<number>
 /**
  * Save a repository for a user
  */
-export async function saveRepository(userId: string, repositoryId: string, notes?: string): Promise<void> {
+export async function saveRepository(
+  userId: string,
+  repositoryId: string,
+  notes?: string
+): Promise<void> {
   await prisma.savedRepository.create({
     data: {
       userId,
@@ -182,13 +188,14 @@ export async function isRepositoryStale(repoId: number): Promise<boolean> {
       repoId,
     },
   });
-  
+
   if (!repo) return true;
-  
+
   const lastFetched = new Date(repo.lastFetchedAt);
   const now = new Date();
-  const differenceInHours = (now.getTime() - lastFetched.getTime()) / (1000 * 60 * 60);
-  
+  const differenceInHours =
+    (now.getTime() - lastFetched.getTime()) / (1000 * 60 * 60);
+
   return differenceInHours > 24;
 }
 
@@ -200,19 +207,18 @@ export async function getAvailableLanguages(): Promise<string[]> {
     select: {
       language: true,
     },
-    distinct: ['language'],
+    distinct: ["language"],
     where: {
       language: {
         not: null,
       },
     },
   });
-  
+
   return results
-    .map(result => result.language)
+    .map((result) => result.language)
     .filter((lang): lang is string => lang !== null);
 }
-
 
 import {
   checkRateLimit,
@@ -227,19 +233,15 @@ export async function fetchRepositories(
   filter?: RepoFilter
 ): Promise<ProcessedRepo[]> {
   try {
-    // Convert null to undefined to match the expected parameter type
     const token = userToken === null ? undefined : userToken;
 
-    // Check rate limit first
     const hasQuota = await checkRateLimit(token);
     if (!hasQuota) {
       throw new GitHubRateLimitError();
     }
 
-    // Fetch repositories based on filter or default to quality repos
     const repos = await fetchQualityRepos(page, token);
 
-    // Process repositories with the token to ensure auth is passed along
     const processedRepos = await processRepositoriesData(repos, {
       userToken: token,
     });
@@ -253,21 +255,23 @@ export async function fetchRepositories(
 /**
  * Get top topics in the database
  */
-export async function getTopTopics(limit = 10): Promise<{topic: string; count: number}[]> {
+export async function getTopTopics(
+  limit = 10
+): Promise<{ topic: string; count: number }[]> {
   const repos = await prisma.repository.findMany({
     select: {
       topics: true,
     },
   });
-  
+
   const topicCounts: Record<string, number> = {};
-  
-  repos.forEach(repo => {
-    repo.topics.forEach(topic => {
+
+  repos.forEach((repo) => {
+    repo.topics.forEach((topic) => {
       topicCounts[topic] = (topicCounts[topic] || 0) + 1;
     });
   });
-  
+
   return Object.entries(topicCounts)
     .map(([topic, count]) => ({ topic, count }))
     .sort((a, b) => b.count - a.count)
