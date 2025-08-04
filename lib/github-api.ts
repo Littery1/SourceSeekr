@@ -378,20 +378,10 @@ export async function fetchQualityRepos(
       searchQuery
     )}&sort=stars&order=desc&per_page=${REPOS_PER_PAGE}&page=${page}`;
 
-    // The userToken here is what we get from the getToken() function in the API route.
-    const headers = getHeaders(userToken);
-    
-    // This log will tell us if the Authorization header is actually being sent.
-    if (headers.Authorization) {
-        console.log(`🚀 Fetching from GitHub with Authorization header.`);
-    } else {
-        console.warn(`🚨 Fetching from GitHub WITHOUT Authorization header. This will likely fail or be rate-limited.`);
-    }
-
-    const res = await fetch(apiUrl, { headers });
+    const res = await fetch(apiUrl, { headers: getHeaders(userToken) });
 
     // Use the error handler to check the response
-    await handleGitHubApiResponse(res);
+    await handleGitHubApiResponse(res); // <-- Add this line
 
     const data = await res.json();
     return (data.items || []).filter(
@@ -403,8 +393,9 @@ export async function fetchQualityRepos(
         )
     );
   } catch (error) {
-    console.error("🔥 Error in fetchQualityRepos:", error);
-    throw error; // Re-throw the error to be handled by the API route
+    console.error("Error fetching quality repositories:", error);
+    // Re-throw the original error to be caught by the API route
+    throw error;
   }
 }
   /**
