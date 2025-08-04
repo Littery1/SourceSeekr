@@ -1,10 +1,11 @@
 // app/api/auth/[...nextauth]/route.ts
-import { GET, POST } from "@/auth"; // Import from your root auth.ts
+import { GET, POST } from "@/auth";
 
-// Re-export for Next.js App Router
+console.log("✅ NextAuth route handler loaded");
+
 export { GET, POST };
 
-// Vercel configuration (keep if you had these)
+// Vercel configuration
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
