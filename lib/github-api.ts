@@ -851,7 +851,7 @@ export async function fetchQualityRepos(
         throw new GitHubAuthError("GitHub token is required for GraphQL API");
       }
       
-           const query = `
+ const query = `
     query RepositoryData($owner: String!, $name: String!) {
       repository(owner: $owner, name: $name) {
         id
@@ -859,7 +859,7 @@ export async function fetchQualityRepos(
         description
         stargazerCount
         forkCount
-        openIssues: issues(states: OPEN, first: 5) { # Correct placement of 'first: 5'
+        openIssues: issues(states: OPEN, first: 5) {
           totalCount
           nodes {
             title
@@ -876,12 +876,6 @@ export async function fetchQualityRepos(
         owner {
           login
           avatarUrl
-        }
-        collaborators(first: 10, affiliation: DIRECT) {
-          nodes {
-            login
-            avatarUrl
-          }
         }
         repositoryTopics(first: 20) {
           nodes {
